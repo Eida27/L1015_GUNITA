@@ -137,7 +137,11 @@ describe('real isolated PostgreSQL/PostGIS integrity', () => {
     }
   });
   it('fails closed when the stored relation guard is missing', async () => {
-    const name = '0004_schema_inventory.sql';
+    const name = (
+      await db.query(
+        'SELECT name FROM schema_migrations ORDER BY name DESC LIMIT 1',
+      )
+    ).rows[0].name;
     const original = (
       await db.query(
         'SELECT relation_inventory FROM schema_migrations WHERE name=$1',
@@ -184,7 +188,7 @@ describe('real isolated PostgreSQL/PostGIS integrity', () => {
         await readFile(new URL('0001_auth.sql', source)),
       );
       await writeFile(
-        join(directory, '0005_failure.sql'),
+        join(directory, '9999_failure.sql'),
         'CREATE TABLE rollback_marker(id integer); SELECT 1/0;',
       );
       await expect(migrate(db, directory)).rejects.toMatchObject({
@@ -439,6 +443,9 @@ describe('real isolated PostgreSQL/PostGIS integrity', () => {
       Array.from({ length: 6 }, async () => {
         const client = new pg.Client({ connectionString: testUrl });
         await client.connect();
+        await client.query(
+          "SET default_transaction_isolation='read committed'",
+        );
         return client;
       }),
     );
@@ -468,6 +475,69 @@ describe('real isolated PostgreSQL/PostGIS integrity', () => {
       await Promise.all(clients.map((client) => client.end()));
     }
   });
+  it.each(['repeatable read', 'serializable', 'read uncommitted'])(
+    'rejects %s publication transactions after all six snapshots are established',
+    async (isolation) => {
+      const author = await user();
+      const clients = await Promise.all(
+        Array.from({ length: 6 }, async () => {
+          const client = new pg.Client({ connectionString: testUrl });
+          await client.connect();
+          return client;
+        }),
+      );
+      try {
+        // Establish every transaction snapshot before any insert can commit.
+        await Promise.all(
+          clients.map(async (client) => {
+            await client.query(`BEGIN ISOLATION LEVEL ${isolation}`);
+            expect(
+              (
+                await client.query(
+                  'SELECT count(*)::int AS n FROM post_quota_events',
+                )
+              ).rows[0].n,
+            ).toBe(0);
+          }),
+        );
+        const results = await Promise.all(
+          clients.map(async (client) => {
+            try {
+              await client.query(
+                `INSERT INTO thoughts(public_id,author_id,body,emotion,public_point,privacy_cell,privacy_tier,privacy_algorithm_version,location_label)
+              VALUES($1,$2,'Isolation disposable fixture','hope',ST_SetSRID(ST_MakePoint(120.98,14.6),4326),'87752a30dffffff',7,1,'Metro Manila')`,
+                [`t_${randomBytes(16).toString('base64url')}`, author],
+              );
+              await client.query('COMMIT');
+              return { outcome: 'committed' };
+            } catch (error) {
+              await client.query('ROLLBACK');
+              return { outcome: 'rejected', code: error.code };
+            }
+          }),
+        );
+        const counts = (
+          await db.query(
+            'SELECT (SELECT count(*)::int FROM thoughts) AS thoughts,(SELECT count(*)::int FROM post_quota_events) AS quota_events',
+          )
+        ).rows[0];
+        expect({ results, counts }).toEqual({
+          results: Array.from({ length: 6 }, () => ({
+            outcome: 'rejected',
+            code: '25000',
+          })),
+          counts: { thoughts: 0, quota_events: 0 },
+        });
+      } finally {
+        await Promise.all(
+          clients.map(async (client) => {
+            await client.query('ROLLBACK');
+            await client.end();
+          }),
+        );
+      }
+    },
+  );
   it('provisions a runtime that reads/writes domain data but cannot migrate, promote roles, or erase quota/audit/static data', async () => {
     const suffix = randomBytes(6).toString('hex');
     const migrationRole = `gunita_test_m_${suffix}`,
