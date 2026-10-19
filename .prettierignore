@@ -7,3 +7,6 @@ docs/plans/IMPLEMENTATION_PLAN.md
 .superpowers
 playwright-report
 test-results
+.local
+assets/geo/*.geojson
+docs/verification/auth-schema-1.7.11.ts.txt

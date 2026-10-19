@@ -22,9 +22,17 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "services:up": "docker compose up -d --wait db mailpit",
-    "services:down": "docker compose down"
+    "services:down": "docker compose down",
+    "db:prepare": "node scripts/db.mjs prepare",
+    "db:migrate": "node scripts/db.mjs migrate",
+    "db:seed:geo": "node scripts/db.mjs seed",
+    "maintenance:expire": "node scripts/db.mjs expire",
+    "test:integration": "vitest run tests/integration"
   },
   "dependencies": {
+    "@better-auth/drizzle-adapter": "1.7.11",
+    "better-auth": "1.7.11",
+    "drizzle-orm": "0.45.4",
     "next": "16.4.2",
     "pg": "8.23.1",
     "react": "19.3.1",
@@ -34,8 +42,11 @@
   "devDependencies": {
     "@playwright/test": "1.64.1",
     "@types/node": "24.19.2",
+    "@types/pg": "8.15.6",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
+    "auth": "1.7.11",
+    "drizzle-kit": "0.31.11",
     "eslint": "9.39.5",
     "eslint-config-next": "16.4.2",
     "prettier": "3.9.10",

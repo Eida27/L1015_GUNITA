@@ -1,5 +1,6 @@
 .git
 .superpowers
+.local
 node_modules
 .next
 coverage

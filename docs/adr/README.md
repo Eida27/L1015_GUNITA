@@ -15,6 +15,8 @@ Status: accepted by the approved [design specification](../specs/IMPLEMENTATION_
 | 009 | Reaction totals belong only to the author/authorized moderator. Separate private uncached APIs prevent public DTO/cache leakage.                                                        | Interaction phase.                                                      |
 | 010 | Compose enables paid-service-free local development and later portable VPS packaging. Production provisioning, TLS, providers and public launch require their own gates.                | Local services now; production packaging later.                         |
 
+Additional accepted decisions: [ADR 011: database integrity and least privilege](011-database-integrity.md), [ADR 012: early spatial baseline refresh](012-postgis-baseline-refresh.md).
+
 ## Foundation details
 
 - Local development publishes PostgreSQL only to `127.0.0.1:55435` for the host-run application and tools. Docker's `database` network remains internal. A separate `host-access` bridge contains only the DB and enables host port publishing: an internal-only attachment produced an empty published-port map on Docker Desktop and made the host app's readiness check fail. This development bridge permits DB egress; it is an explicit local-only exception to production isolation, never a production Compose template.
@@ -43,11 +45,11 @@ Queried from the npm registry on 2026-10-19. Installed dependencies are exact in
 | Playwright                                 | 1.64.1           | Installed                                                               |
 | @types/node                                | 24.19.2          | Installed; aligns with Node 24                                          |
 | @types/react / react-dom                   | 19.3.0           | Installed                                                               |
-| Better Auth / @better-auth/drizzle-adapter | 1.7.11           | Reserved for auth/schema                                                |
-| Drizzle ORM / Kit                          | 0.45.4 / 0.31.11 | Reserved for schema                                                     |
+| Better Auth / @better-auth/drizzle-adapter | 1.7.11           | Installed Phase 1; auth CLI also pinned 1.7.11                          |
+| Drizzle ORM / Kit                          | 0.45.4 / 0.31.11 | Installed Phase 1                                                       |
 | MapLibre GL JS                             | 6.15.0           | Reserved for map                                                        |
 | h3-js                                      | 4.5.0            | Reserved for location privacy                                           |
 
-Docker manifests were inspected using `docker buildx imagetools inspect`; Compose pins immutable SHA-256 index digests. The selected PostGIS image actually contains PostgreSQL 17.5 and PostGIS 3.5; Mailpit is 1.31.6. PostgreSQL 17.5 is an old patch baseline: review and replace the image with a supported patched release during security hardening before any production use. These local-only image pins establish reproducibility, not patch-currency certification. Digests, not mutable tags, define the image contents.
+Docker manifests were inspected using `docker buildx imagetools inspect`; Compose pins immutable SHA-256 index digests. Phase 1 replaced the retired Phase 0 PostgreSQL 17.5/PostGIS 3.5.2 image with verified PostgreSQL 17.11/PostGIS 3.6.4; see [ADR 012](012-postgis-baseline-refresh.md) for backup, restore, extension/collation upgrade and current digest evidence. Mailpit remains 1.31.6. These local pins establish reproducibility, not production vulnerability certification.
 
 References checked: [Next.js installation](https://nextjs.org/docs/app/getting-started/installation), [standalone output](https://nextjs.org/docs/app/api-reference/config/next-config-js/output), [Vitest configuration](https://vitest.dev/config/), [Playwright configuration](https://playwright.dev/docs/test-configuration), [Better Auth installation](https://better-auth.com/docs/installation), [Drizzle adapter](https://better-auth.com/docs/adapters/drizzle).

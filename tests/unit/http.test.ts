@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { GET } from '@/app/api/health/route';
 import { GET as ready } from '@/app/api/ready/route';
@@ -37,10 +37,15 @@ describe('minimal public HTTP contracts', () => {
     });
   });
   it('reports unavailable readiness without database configuration or internal details', async () => {
-    const response = await ready();
-    expect(response.status).toBe(503);
-    expect(await response.json()).toEqual({ status: 'unavailable' });
-    expect(response.headers.get('cache-control')).toBe('no-store');
+    vi.stubEnv('DATABASE_URL', '');
+    try {
+      const response = await ready();
+      expect(response.status).toBe(503);
+      expect(await response.json()).toEqual({ status: 'unavailable' });
+      expect(response.headers.get('cache-control')).toBe('no-store');
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
   it('returns schema-validated data', async () => {
     const request = new Request('http://localhost', {

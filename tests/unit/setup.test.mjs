@@ -1,16 +1,22 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve, dirname, basename } from 'node:path';
 import { setupLocal } from '../../scripts/setup-lib.mjs';
 import { validateEnv } from '../../scripts/env.mjs';
+import { prepareLocalDatabaseEnv } from '../../scripts/database-env.mjs';
 
 const directories = [];
 afterEach(async () => {
   await Promise.all(
-    directories
-      .splice(0)
-      .map((path) => rm(path, { recursive: true, force: true })),
+    directories.splice(0).map((path) => {
+      if (
+        dirname(resolve(path)) !== resolve(tmpdir()) ||
+        !basename(path).startsWith('gunita-')
+      )
+        throw new Error('Unsafe test directory cleanup');
+      return rm(path, { recursive: true, force: true });
+    }),
   );
 });
 async function temporary() {
@@ -20,6 +26,26 @@ async function temporary() {
 }
 
 describe('local setup safety', () => {
+  it('separates web runtime credentials from privileged migration/bootstrap settings without rotating an existing database password', async () => {
+    const directory = await temporary();
+    await setupLocal(directory);
+    const original = await readFile(join(directory, '.env'), 'utf8');
+    expect(await prepareLocalDatabaseEnv(directory)).toBe(true);
+    const web = await readFile(join(directory, '.env'), 'utf8');
+    const privileged = await readFile(join(directory, '.env.db'), 'utf8');
+    const originalPassword = original.match(/^POSTGRES_PASSWORD=(.+)$/m)[1];
+    expect(web).toContain(`POSTGRES_PASSWORD=${originalPassword}`);
+    expect(web).toContain('DATABASE_URL=postgresql://gunita_app:');
+    expect(web).not.toContain('MIGRATION_DATABASE_URL');
+    expect(privileged).toContain(
+      `BOOTSTRAP_DATABASE_URL=postgresql://gunita:${originalPassword}@`,
+    );
+    expect(privileged).toContain(
+      'MIGRATION_DATABASE_URL=postgresql://gunita_migrator:',
+    );
+    expect(await prepareLocalDatabaseEnv(directory)).toBe(false);
+    expect(await readFile(join(directory, '.env.db'), 'utf8')).toBe(privileged);
+  });
   it('creates valid unique local secrets rather than a shared committed password', async () => {
     const first = await temporary();
     const second = await temporary();

@@ -2,6 +2,8 @@ import { spawnSync } from 'node:child_process';
 import { setupLocal } from './setup-lib.mjs';
 import { loadLocalEnv } from './load-env.mjs';
 import { validateEnv } from './env.mjs';
+import { readFileSync } from 'node:fs';
+import { parseEnv } from 'node:util';
 
 await setupLocal(process.cwd());
 loadLocalEnv();
@@ -17,5 +19,14 @@ if (result.status !== 0) {
   );
   process.exitCode = 1;
 } else {
-  await import('./dev.mjs');
+  const database = spawnSync(process.execPath, ['scripts/db.mjs', 'prepare'], {
+    stdio: 'inherit',
+  });
+  if (database.status !== 0) process.exitCode = 1;
+  else {
+    process.env.DATABASE_URL = parseEnv(
+      readFileSync('.env', 'utf8'),
+    ).DATABASE_URL;
+    await import('./dev.mjs');
+  }
 }
