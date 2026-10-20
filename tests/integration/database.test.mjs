@@ -24,12 +24,16 @@ let testUrl;
 const suiteMigrationRole = `gunita_test_m_${randomBytes(6).toString('hex')}`;
 const suiteRuntimeRole = `gunita_test_r_${randomBytes(6).toString('hex')}`;
 async function user(email = `${randomBytes(8).toString('hex')}@test.invalid`) {
-  return (
+  const id = (
     await db.query(
       'INSERT INTO "user"(name,email) VALUES($1,$2) RETURNING id',
       ['Internal', email],
     )
   ).rows[0].id;
+  // These low-level integrity fixtures intentionally build their own profiles.
+  // The auth suite independently proves automatic atomic profile creation.
+  await db.query('DELETE FROM profiles WHERE user_id=$1', [id]);
+  return id;
 }
 async function thought(author, overrides = {}) {
   return (

@@ -1,4 +1,31 @@
 const errors = {
+  UNAUTHENTICATED: { status: 401, message: 'Sign in to continue.' },
+  INVALID_CREDENTIALS: {
+    status: 401,
+    message: 'Email or password is incorrect.',
+  },
+  EMAIL_UNVERIFIED: {
+    status: 403,
+    message: 'Verify your email before continuing.',
+  },
+  ACCOUNT_SUSPENDED: {
+    status: 403,
+    message: 'This account cannot perform member actions.',
+  },
+  FORBIDDEN: { status: 403, message: 'This action is not available.' },
+  INVALID_TOKEN: {
+    status: 400,
+    message:
+      'This link has expired or has already been used. Request a new link.',
+  },
+  RATE_LIMITED: {
+    status: 429,
+    message: 'Too many attempts. Please wait before trying again.',
+  },
+  EMAIL_DELIVERY_FAILED: {
+    status: 503,
+    message: 'Email delivery is unavailable. Please try again.',
+  },
   INTERNAL_ERROR: {
     status: 500,
     message: 'Something went wrong. Please try again.',

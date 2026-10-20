@@ -32,12 +32,17 @@ export default function Home() {
               <p className="note-title">Taking shape, thoughtfully.</p>
               <p>
                 This is the local development foundation.
-                <br className="desktop-break" /> Map, accounts, and publishing
-                are still to come.
+                <br className="desktop-break" /> Accounts are ready. Map and
+                publishing are still to come.
               </p>
-              <a className="health-link" href="/api/health">
+              <Link className="health-link" href="/api/health" prefetch={false}>
                 Check app health <span aria-hidden="true">↗</span>
-              </a>
+              </Link>
+              <nav className="account-links" aria-label="Your account">
+                <Link href="/sign-up">Create an account</Link>
+                <Link href="/log-in">Sign in</Link>
+                <Link href="/settings">Settings</Link>
+              </nav>
             </div>
           </div>
           <div className="quiet-art" aria-hidden="true">

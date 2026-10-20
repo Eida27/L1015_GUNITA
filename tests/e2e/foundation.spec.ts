@@ -20,7 +20,7 @@ test('foundation is labeled honestly and exposes a working health link', async (
     page.getByText('Local foundation', { exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByText('Map, accounts, and publishing are still to come.'),
+    page.getByText('Accounts are ready. Map and publishing are still to come.'),
   ).toBeVisible();
   await page.getByRole('link', { name: 'Check app health' }).click();
   await expect(page.locator('body')).toContainText('"status":"ok"');

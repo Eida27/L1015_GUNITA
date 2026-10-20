@@ -103,7 +103,17 @@ pnpm start
 
 The preview runs the standalone build on loopback using local generated settings; clear `LOCAL_PREVIEW` afterward. `pnpm start` validates configuration **before** importing `.next/standalone/server.js`. Without local preview it requires an HTTPS origin, a database URL, non-placeholder auth secret, production Turnstile keys, SMTP sender/host and HTTPS map style. Errors list field names only. Building does not require paid provider credentials.
 
-No production deployment or readiness is claimed. Later phases must provide verified SMTP delivery, authorized map tiles, boundary provenance, auth/permissions, expiry, moderation, reviewed legal/help content, encrypted offsite backups with restore proof, TLS and monitoring before launch. A multi-stage web Docker image and production Compose are planned in the deployment phase.
+No production deployment or readiness is claimed. Later phases must provide real SMTP delivery, authorized map tiles, complete write permissions, expiry scheduling, moderation, reviewed legal/help content, encrypted offsite backups with restore proof, TLS and monitoring before launch. A multi-stage web Docker image and production Compose are planned in the deployment phase.
+
+## Local accounts (Phase 2)
+
+Open `/sign-up`, register a fictional `@test.invalid` address with a 12–128 character password, then inspect [Mailpit](http://127.0.0.1:8028). Follow the verification link and confirm. `/log-in` opens private `/settings`; `/log-out`, `/forgot-password`, `/reset-password` and `/verify-email` provide logout, password reset and resend. There is no OAuth or email-change flow. A reset signs every session out. Verified account deletion requires the current password and removes the live account and related content. Legal summaries linked from forms are local drafts pending launch review.
+
+The app creates a permanent server-generated pseudonym and member profile atomically. Client name, image, role, verification and pseudonym fields are ignored. Library authentication endpoints are exposed only through an explicit application allowlist; default account editing/deletion and session JSON are unavailable. Accounts and settings do not implement a map or composer.
+
+SMTP is captured locally on port 1028; default sender is `Gunita <hello@gunita.test>`. Production uses `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_FROM` and optionally `SMTP_USER`/`SMTP_PASSWORD`; real provider setup and delivery testing remain launch gates. A global SMTP outage gives a generic delivery-unavailable state for every address. After a recipient-specific rejection, a conditional receipt may be returned without creating an account; request another link if it never arrives. Neither a receipt nor its timing is a delivery guarantee. Tokens travel in fragments, are removed immediately in the browser, expire after one hour, and are single-use.
+
+For later mutations, call `getAuthService().withAuthTransaction(async context => { ... })`, then `requireVerifiedMember(context, request.headers)` (or `requireAdmin` / `requireOwner`) before writing through `context.client`. All protected state and writes must share that transaction. Guards return private actor data; never serialize it as public content. Validate Origin and bounded input in each new route; apply route-specific rate limits and current guideline consent for publication. Read [ADR 013](docs/adr/013-account-lifecycle.md) and [Phase 2 evidence](docs/verification/phase-2.md) for exact producer and privacy contracts. Publication still requires READ COMMITTED and must not duplicate trigger-owned quota events.
 
 ## Teardown
 
