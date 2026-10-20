@@ -1,6 +1,8 @@
 'use client';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import Link from 'next/link';
+import { usePreferences } from '@/components/ui/preferences';
+import { errorKey, type MessageKey } from '@/lib/i18n/catalog';
 import { useHydrated } from './use-hydrated';
 
 type Mode =
@@ -44,7 +46,7 @@ const copy = {
       'Sign out of this browser. Your thoughts keep their original expiration date.',
     button: 'Sign out',
   },
-};
+} as const;
 const actions = {
   'sign-up': 'sign-up/email',
   'log-in': 'sign-in/email',
@@ -61,14 +63,14 @@ async function submitJson(action: string, body: Record<string, string>) {
     cache: 'no-store',
   });
   const data = await response.json();
-  if (!response.ok)
-    throw new Error(data.message || 'Something went wrong. Please try again.');
+  if (!response.ok) throw new Error(data.code || 'INTERNAL_ERROR');
 }
 export function AuthForm({ mode }: { mode: Mode }) {
+  const { t } = usePreferences();
   const hydrated = useHydrated();
   const [busy, setBusy] = useState(false),
-    [error, setError] = useState(''),
-    [message, setMessage] = useState('');
+    [error, setError] = useState<MessageKey | ''>(''),
+    [message, setMessage] = useState<MessageKey | ''>('');
   const token = useRef('');
   useEffect(() => {
     if (!token.current)
@@ -118,7 +120,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
           'If this address is eligible, check your email for a link. Delivery may be delayed. If it does not arrive, request another link.',
         );
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Please try again.');
+      setError(errorKey(error instanceof Error ? error.message : undefined));
     } finally {
       setBusy(false);
     }
@@ -135,7 +137,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
         'If this address needs verification, check your email. Delivery may be delayed; you can try again later.',
       );
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Please try again.');
+      setError(errorKey(error instanceof Error ? error.message : undefined));
     } finally {
       setBusy(false);
     }
@@ -143,28 +145,29 @@ export function AuthForm({ mode }: { mode: Mode }) {
   return (
     <div className="account-grid">
       <section className="account-intro">
-        <p className="eyebrow">A little room to feel.</p>
-        <h1>{copy[mode].title}</h1>
-        <p className="introduction">{copy[mode].intro}</p>
+        <p className="eyebrow">{t('A little room to feel.')}</p>
+        <h1>{t(copy[mode].title)}</h1>
+        <p className="introduction">{t(copy[mode].intro)}</p>
         <p className="account-aside">
-          Your pseudonym is permanent. It connects your thoughts to one another,
-          while your email stays private.
+          {t(
+            'Your pseudonym is permanent. It connects your thoughts to one another, while your email stays private.',
+          )}
         </p>
       </section>
-      <section className="account-card" aria-label="Account form">
+      <section className="account-card" aria-label={t('Account form')}>
         {error && (
           <p role="alert" className="form-error">
-            {error}
+            {t(error)}
           </p>
         )}
         {message && (
           <p role="status" className="form-message">
-            {message}
+            {t(message)}
           </p>
         )}
         <noscript>
           <p className="form-error">
-            Enable JavaScript to use secure account forms.
+            {t('Enable JavaScript to use secure account forms.')}
           </p>
         </noscript>
         <form
@@ -175,7 +178,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
         >
           {needsEmail && (
             <label>
-              Email address
+              {t('Email address')}
               <input
                 name="email"
                 type="email"
@@ -187,7 +190,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
           )}
           {needsPassword && (
             <label>
-              {mode === 'reset-password' ? 'New password' : 'Password'}
+              {mode === 'reset-password' ? t('New password') : t('Password')}
               <input
                 name="password"
                 type="password"
@@ -202,29 +205,34 @@ export function AuthForm({ mode }: { mode: Mode }) {
           )}
           {['sign-up', 'reset-password'].includes(mode) && (
             <p className="field-help">
-              Use 12–128 characters. A long, unique passphrase works well.
+              {t(
+                'Use 12–128 characters. A long, unique passphrase works well.',
+              )}
             </p>
           )}
           {mode === 'sign-up' && (
             <p className="field-help">
-              By creating an account you agree to the{' '}
-              <Link href="/terms">Terms</Link> and{' '}
-              <Link href="/guidelines">Community Guidelines</Link>. Read how we
-              handle your information in our{' '}
-              <Link href="/privacy">Privacy Policy</Link>.
+              {t('By creating an account you agree to the')}{' '}
+              <Link href="/terms">{t('Terms')}</Link> {t('and')}{' '}
+              <Link href="/guidelines">{t('Community Guidelines')}</Link>.{' '}
+              {t('Read how we handle your information in our')}{' '}
+              <Link href="/privacy">{t('Privacy Policy')}</Link>.
             </p>
           )}
           {mode === 'reset-password' && (
-            <p className="field-help">Open the reset link from your email.</p>
+            <p className="field-help">
+              {t('Open the reset link from your email.')}
+            </p>
           )}
           {mode === 'verify-email' && (
             <p className="field-help">
-              Open your email link, then confirm below. Links expire after one
-              hour and can only be used once.
+              {t(
+                'Open your email link, then confirm below. Links expire after one hour and can only be used once.',
+              )}
             </p>
           )}
           <button type="submit" disabled={!hydrated || busy}>
-            {busy ? 'Please wait…' : copy[mode].button}
+            {busy ? t('Please wait…') : t(copy[mode].button)}
           </button>
         </form>
         {mode === 'verify-email' && (
@@ -234,7 +242,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
             className="account-form resend-form"
           >
             <label>
-              Email address
+              {t('Email address')}
               <input
                 name="email"
                 type="email"
@@ -248,24 +256,26 @@ export function AuthForm({ mode }: { mode: Mode }) {
               className="secondary-button"
               disabled={!hydrated || busy}
             >
-              Send a new verification link
+              {t('Send a new verification link')}
             </button>
           </form>
         )}
-        <nav className="account-links" aria-label="Account options">
-          {mode !== 'log-in' && <Link href="/log-in">Sign in</Link>}
+        <nav className="account-links" aria-label={t('Account options')}>
+          {mode !== 'log-in' && <Link href="/log-in">{t('Sign in')}</Link>}
           {mode === 'log-in' && (
             <>
-              <Link href="/forgot-password">Forgot password?</Link>
-              <Link href="/verify-email">Resend verification</Link>
-              <Link href="/sign-up">Create an account</Link>
+              <Link href="/forgot-password">{t('Forgot password?')}</Link>
+              <Link href="/verify-email">{t('Resend verification')}</Link>
+              <Link href="/sign-up">{t('Create an account')}</Link>
             </>
           )}
           {mode === 'sign-up' && (
-            <Link href="/verify-email">Resend verification</Link>
+            <Link href="/verify-email">{t('Resend verification')}</Link>
           )}
           {mode === 'reset-password' && (
-            <Link href="/forgot-password">Request another reset link</Link>
+            <Link href="/forgot-password">
+              {t('Request another reset link')}
+            </Link>
           )}
         </nav>
       </section>

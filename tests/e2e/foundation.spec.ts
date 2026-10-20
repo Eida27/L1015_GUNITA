@@ -1,4 +1,10 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
+async function enter(page: Page) {
+  await page.goto('/');
+  await page.getByRole('dialog').getByRole('checkbox').check();
+  await page.getByRole('button', { name: 'Enter Gunita' }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+}
 
 test('database readiness crosses the host application boundary', async ({
   request,
@@ -12,7 +18,7 @@ test('database readiness crosses the host application boundary', async ({
 test('foundation is labeled honestly and exposes a working health link', async ({
   page,
 }) => {
-  await page.goto('/');
+  await enter(page);
   await expect(page.getByRole('heading', { level: 1 })).toContainText(
     'feelings left unsaid',
   );
@@ -30,13 +36,15 @@ test('fits a narrow viewport with semantic landmarks and keyboard navigation', a
   page,
 }) => {
   await page.setViewportSize({ width: 320, height: 740 });
-  await page.goto('/');
+  await enter(page);
   await expect(page.getByRole('main')).toBeVisible();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
+  await page.reload();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.keyboard.press('Tab');
   await expect(
     page.getByRole('link', { name: 'Skip to content' }),

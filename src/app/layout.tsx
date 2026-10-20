@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import '@/styles/globals.css';
+import { PreferencesProvider, Text } from '@/components/ui/preferences';
 
 export const metadata: Metadata = {
   title: 'Gunita — A place for feelings left unsaid',
@@ -14,10 +15,12 @@ export default function RootLayout({
   return (
     <html lang="en" data-scroll-behavior="smooth">
       <body>
-        <a className="skip-link" href="#main">
-          Skip to content
-        </a>
-        {children}
+        <PreferencesProvider>
+          <a className="skip-link" href="#main">
+            <Text id="Skip to content" />
+          </a>
+          {children}
+        </PreferencesProvider>
       </body>
     </html>
   );

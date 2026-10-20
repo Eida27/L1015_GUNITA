@@ -1,47 +1,63 @@
+'use client';
 import Link from 'next/link';
+import {
+  PublicContentGate,
+  type PublicContentLoader,
+} from '@/components/ui/public-content-gate';
+import {
+  usePreferences,
+  PreferenceControls,
+} from '@/components/ui/preferences';
 
+// Phase 4 replaces the empty client module with its map loader.
+const loadPublicContent: PublicContentLoader = async () => () => null;
 export default function Home() {
+  const { t } = usePreferences();
   return (
     <div className="site-shell">
       <header className="site-header">
-        <Link className="wordmark" href="/" aria-label="Gunita home">
+        <Link className="wordmark" href="/" aria-label={t('Gunita home')}>
           <span aria-hidden="true" className="brand-mark">
             g.
           </span>
           gunita
         </Link>
+        <PreferenceControls />
         <span className="build-label">
           <span aria-hidden="true" />
-          Local foundation
+          {t('Local foundation')}
         </span>
       </header>
-      <main id="main">
+      <main tabIndex={-1} id="main">
+        <PublicContentGate load={loadPublicContent} />
         <section className="hero" aria-labelledby="welcome-title">
           <div className="hero-copy">
-            <p className="eyebrow">A little room to feel.</p>
+            <p className="eyebrow">{t('A little room to feel.')}</p>
             <h1 id="welcome-title">
-              A place for
+              {t('A place for')}
               <br />
-              <em>feelings left unsaid.</em>
+              <em>{t('feelings left unsaid.')}</em>
             </h1>
             <p className="introduction">
-              Some things stay with us. We’re making a quiet space to set them
-              down, one thought and one place at a time.
+              {t(
+                'Some things stay with us. We’re making a quiet space to set them down, one thought and one place at a time.',
+              )}
             </p>
             <div className="foundation-note">
-              <p className="note-title">Taking shape, thoughtfully.</p>
+              <p className="note-title">{t('Taking shape, thoughtfully.')}</p>
               <p>
-                This is the local development foundation.
-                <br className="desktop-break" /> Accounts are ready. Map and
-                publishing are still to come.
+                {t('This is the local development foundation.')}
+                <br className="desktop-break" />
+                {t('Accounts are ready. Map and publishing are still to come.')}
               </p>
               <Link className="health-link" href="/api/health" prefetch={false}>
-                Check app health <span aria-hidden="true">↗</span>
+                {t('Check app health')}
+                <span aria-hidden="true">↗</span>
               </Link>
-              <nav className="account-links" aria-label="Your account">
-                <Link href="/sign-up">Create an account</Link>
-                <Link href="/log-in">Sign in</Link>
-                <Link href="/settings">Settings</Link>
+              <nav className="account-links" aria-label={t('Your account')}>
+                <Link href="/sign-up">{t('Create an account')}</Link>
+                <Link href="/log-in">{t('Sign in')}</Link>
+                <Link href="/settings">{t('Settings')}</Link>
               </nav>
             </div>
           </div>
@@ -90,50 +106,53 @@ export default function Home() {
                 d="M167 400C201 413 258 417 294 398"
               />
             </svg>
-            <p>Let a little of it go.</p>
+            <p>{t('Let a little of it go.')}</p>
           </div>
         </section>
         <section className="intentions" aria-labelledby="intentions-title">
           <div className="section-intro">
-            <p className="eyebrow">What we’re building</p>
+            <p className="eyebrow">{t('What we’re building')}</p>
             <h2 id="intentions-title">
-              A softer corner
+              {t('A softer corner')}
               <br />
-              of the internet.
+              {t('of the internet.')}
             </h2>
           </div>
           <div className="intention">
             <span className="item-number">01</span>
-            <h3>Room for real feelings</h3>
+            <h3>{t('Room for real feelings')}</h3>
             <p>
-              Short thoughts, memories, and unsent messages. No popularity
-              rankings or public reaction counts.
+              {t(
+                'Short thoughts, memories, and unsent messages. No popularity rankings or public reaction counts.',
+              )}
             </p>
           </div>
           <div className="intention">
             <span className="item-number">02</span>
-            <h3>A place, kept approximate</h3>
+            <h3>{t('A place, kept approximate')}</h3>
             <p>
-              A Philippines-first map with deliberately coarse locations. No GPS
-              or precise pin storage.
+              {t(
+                'A Philippines-first map with deliberately coarse locations. No GPS or precise pin storage.',
+              )}
             </p>
           </div>
           <div className="intention">
             <span className="item-number">03</span>
-            <h3>Made to gently fade</h3>
+            <h3>{t('Made to gently fade')}</h3>
             <p>
-              Thoughts will last 30 days. A moment to be heard, without becoming
-              a permanent public archive.
+              {t(
+                'Thoughts will last 30 days. A moment to be heard, without becoming a permanent public archive.',
+              )}
             </p>
           </div>
         </section>
       </main>
       <footer className="site-footer">
         <span>
-          Gunita <span aria-hidden="true">·</span> A place for feelings left
-          unsaid.
+          Gunita <span aria-hidden="true">·</span>
+          {t('A place for feelings left unsaid.')}
         </span>
-        <span>In progress. With care.</span>
+        <span>{t('In progress. With care.')}</span>
       </footer>
     </div>
   );
