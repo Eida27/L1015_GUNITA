@@ -1,12 +1,12 @@
-import type { Pool, PoolClient } from 'pg';
-import { verifyPassword } from 'better-auth/crypto';
+import type { Pool } from 'pg';
+import { hashPassword, verifyPassword } from 'better-auth/crypto';
 import { getSessionCookie } from 'better-auth/cookies';
 import { z } from 'zod';
 import { parseJsonBody } from '@/lib/validation/json';
 import { ApiError, errorResponse } from '@/lib/api/errors';
 import { smtpSender, type EmailSender } from './email';
 import { createLibrary, tokenDigest } from './library';
-import { requireVerifiedMember, type AuthContext } from './guards';
+import { lockAccount, requireVerifiedMember, type AuthContext } from './guards';
 import { limitAuth } from './rate-limit';
 
 export type AuthOptions = {
@@ -67,13 +67,37 @@ export function createAuthService(options: AuthOptions) {
       client.release();
     }
   }
-  async function existingActive(client: PoolClient, email: string) {
-    return (
-      await client.query(
-        'SELECT u.id,u.email_verified FROM "user" u JOIN profiles p ON p.user_id=u.id WHERE u.email=$1 AND p.status=\'active\' FOR UPDATE OF u,p',
-        [email],
+  async function existingActive(context: AuthContext, email: string) {
+    const discovered = (
+      await context.client.query('SELECT id FROM "user" WHERE email=$1', [
+        email,
+      ])
+    ).rows[0];
+    if (!discovered) return null;
+    const actor = await lockAccount(context, discovered.id);
+    return actor?.email === email && actor.status === 'active' ? actor : null;
+  }
+  async function tokenAccount(context: AuthContext, identifier: string) {
+    // An unlocked lookup discovers only the lock key. Revalidate the claim and
+    // current account after acquiring the common account-first write lock.
+    const discovered = (
+      await context.client.query(
+        'SELECT value FROM verification WHERE identifier=$1 AND expires_at>statement_timestamp()',
+        [identifier],
       )
     ).rows[0];
+    if (!discovered) throw new ApiError('INVALID_TOKEN');
+    const actor = await lockAccount(context, discovered.value);
+    if (!actor || actor.status !== 'active')
+      throw new ApiError('INVALID_TOKEN');
+    const token = (
+      await context.client.query(
+        'SELECT id FROM verification WHERE identifier=$1 AND value=$2 AND expires_at>statement_timestamp() FOR UPDATE',
+        [identifier, actor.userId],
+      )
+    ).rows[0];
+    if (!token) throw new ApiError('INVALID_TOKEN');
+    return actor;
   }
   async function handle(request: Request): Promise<Response> {
     const url = new URL(request.url),
@@ -172,6 +196,13 @@ export function createAuthService(options: AuthOptions) {
             return receipt();
           }
           case 'sign-in/email': {
+            const actor = await existingActive(context, body.email);
+            if (!actor) {
+              // Preserve memory-hard work and generic credentials errors for
+              // unknown/deleted/suspended accounts without authorizing them.
+              await hashPassword(body.password);
+              throw new ApiError('INVALID_CREDENTIALS');
+            }
             const out = await auth.api.signInEmail({
               body: { email: body.email, password: body.password },
               headers,
@@ -185,8 +216,6 @@ export function createAuthService(options: AuthOptions) {
                   : 'INVALID_CREDENTIALS',
               );
             }
-            const actor = await existingActive(client, body.email);
-            if (!actor) throw new ApiError('INVALID_CREDENTIALS');
             return receipt(out.headers);
           }
           case 'sign-out':
@@ -195,10 +224,10 @@ export function createAuthService(options: AuthOptions) {
             );
           case 'send-verification-email':
           case 'request-password-reset': {
-            const actor = await existingActive(client, body.email);
+            const actor = await existingActive(context, body.email);
             if (
               actor &&
-              (action === 'request-password-reset' || !actor.email_verified)
+              (action === 'request-password-reset' || !actor.emailVerified)
             ) {
               if (action === 'request-password-reset')
                 await auth.api.requestPasswordReset({
@@ -216,20 +245,10 @@ export function createAuthService(options: AuthOptions) {
             return receipt();
           }
           case 'verify-email': {
-            const token = (
-              await client.query(
-                'SELECT value FROM verification WHERE identifier=$1 AND expires_at>statement_timestamp() FOR UPDATE',
-                [`email-verify:${tokenDigest(body.token)}`],
-              )
-            ).rows[0];
-            if (!token) throw new ApiError('INVALID_TOKEN');
-            const actor = (
-              await client.query(
-                'SELECT u.email FROM "user" u JOIN profiles p ON p.user_id=u.id WHERE u.id=$1 AND p.status=\'active\' FOR UPDATE OF u,p',
-                [token.value],
-              )
-            ).rows[0];
-            if (!actor) throw new ApiError('INVALID_TOKEN');
+            await tokenAccount(
+              context,
+              `email-verify:${tokenDigest(body.token)}`,
+            );
             const out = await auth.api.verifyEmail({
               query: { token: body.token },
               headers,
@@ -242,20 +261,7 @@ export function createAuthService(options: AuthOptions) {
             return receipt();
           }
           case 'reset-password': {
-            const token = (
-              await client.query(
-                'SELECT value FROM verification WHERE identifier=$1 AND expires_at>statement_timestamp() FOR UPDATE',
-                [`reset-password:${body.token}`],
-              )
-            ).rows[0];
-            if (!token) throw new ApiError('INVALID_TOKEN');
-            const actor = (
-              await client.query(
-                'SELECT u.id FROM "user" u JOIN profiles p ON p.user_id=u.id WHERE u.id=$1 AND p.status=\'active\' FOR UPDATE OF u,p',
-                [token.value],
-              )
-            ).rows[0];
-            if (!actor) throw new ApiError('INVALID_TOKEN');
+            await tokenAccount(context, `reset-password:${body.token}`);
             const out = await auth.api.resetPassword({
               body: { token: body.token, newPassword: body.newPassword },
               headers,

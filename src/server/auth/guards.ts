@@ -11,6 +11,28 @@ export type Actor = {
   status: 'active' | 'suspended';
 };
 
+// This is the first write lock for all account lifecycle/protected work. Keep
+// it through COMMIT, before touching credentials, profiles, tokens or sessions.
+export async function lockAccount(
+  context: AuthContext,
+  userId: string,
+): Promise<Actor | null> {
+  const user = (
+    await context.client.query<Omit<Actor, 'pseudonym' | 'role' | 'status'>>(
+      'SELECT id AS "userId",email,email_verified AS "emailVerified" FROM "user" WHERE id=$1 FOR UPDATE',
+      [userId],
+    )
+  ).rows[0];
+  if (!user) return null;
+  const profile = (
+    await context.client.query<Pick<Actor, 'pseudonym' | 'role' | 'status'>>(
+      'SELECT pseudonym,role,status FROM profiles WHERE user_id=$1 FOR UPDATE',
+      [userId],
+    )
+  ).rows[0];
+  return profile ? { ...user, ...profile } : null;
+}
+
 // Call inside withAuthTransaction: hold current state through the mutation.
 export async function requireAuthenticated(
   context: AuthContext,
@@ -18,18 +40,20 @@ export async function requireAuthenticated(
 ): Promise<Actor> {
   const session = await context.auth.api.getSession({
     headers,
-    query: { disableCookieCache: true },
+    // Discovery authenticates the cookie but cannot refresh/delete a session
+    // before its account is locked (including the expired-session path).
+    query: { disableCookieCache: true, disableRefresh: true },
   });
   if (!session) throw new ApiError('UNAUTHENTICATED');
-  const actor = (
-    await context.client.query<Actor>(
-      `SELECT u.id AS "userId",u.email,u.email_verified AS "emailVerified",p.pseudonym,p.role,p.status
-    FROM "user" u JOIN profiles p ON p.user_id=u.id JOIN session s ON s.user_id=u.id
-    WHERE u.id=$1 AND s.id=$2 AND s.expires_at>statement_timestamp() FOR UPDATE OF u,p,s`,
-      [session.user.id, session.session.id],
+  const actor = await lockAccount(context, session.user.id);
+  if (!actor) throw new ApiError('UNAUTHENTICATED');
+  const currentSession = (
+    await context.client.query<{ id: string }>(
+      'SELECT id FROM session WHERE id=$1 AND user_id=$2 AND token=$3 AND expires_at>statement_timestamp() FOR UPDATE',
+      [session.session.id, actor.userId, session.session.token],
     )
   ).rows[0];
-  if (!actor) throw new ApiError('UNAUTHENTICATED');
+  if (!currentSession) throw new ApiError('UNAUTHENTICATED');
   requireActiveAccount(actor);
   return actor;
 }

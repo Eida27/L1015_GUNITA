@@ -64,6 +64,149 @@ function sessionCookie(response: Response) {
     .map((value) => value.split(';')[0])
     .join('; ');
 }
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+async function within<T>(promise: Promise<T>, message: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(message)), 10000);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+// Instrument the real connection at a query boundary. No query, result, hash,
+// library operation or persistence side effect is replaced by a test double.
+function controlledService(boundary: {
+  before?: (sql: string) => boolean;
+  after?: (sql: string) => boolean;
+}) {
+  const reached = deferred<void>(),
+    release = deferred<void>(),
+    pid = deferred<number>();
+  let paused = false;
+  const intercepted = new Proxy(pool, {
+    get(target, key) {
+      if (key === 'connect')
+        return async () => {
+          const client = await target.connect();
+          pid.resolve(
+            (await client.query('SELECT pg_backend_pid() pid')).rows[0].pid,
+          );
+          return new Proxy(client, {
+            get(connection, property) {
+              if (property === 'query')
+                return async (...args: unknown[]) => {
+                  const sql =
+                    typeof args[0] === 'string'
+                      ? args[0]
+                      : String((args[0] as { text?: string })?.text || '');
+                  const pause = async () => {
+                    paused = true;
+                    reached.resolve();
+                    await release.promise;
+                  };
+                  if (!paused && boundary.before?.(sql)) await pause();
+                  const query = connection.query.bind(connection) as (
+                    ...values: unknown[]
+                  ) => Promise<pg.QueryResult>;
+                  const result = await query(...args);
+                  if (!paused && boundary.after?.(sql)) await pause();
+                  return result;
+                };
+              const value = Reflect.get(connection, property);
+              return typeof value === 'function'
+                ? value.bind(connection)
+                : value;
+            },
+          });
+        };
+      const value = Reflect.get(target, key);
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
+  });
+  return {
+    service: createAuthService({
+      pool: intercepted,
+      origin,
+      secret: authSecret,
+      smtpPort: 1028,
+    }),
+    reached,
+    release,
+    pid,
+  };
+}
+async function resolvedOrBlocked(
+  request: Promise<Response>,
+  waiter: number,
+  blocker: number,
+) {
+  let completed = false;
+  void request.then(() => {
+    completed = true;
+  });
+  const deadline = Date.now() + 10000;
+  while (Date.now() < deadline) {
+    if (completed) return 'completed';
+    const row = (
+      await db.query('SELECT $2::integer=ANY(pg_blocking_pids($1)) blocked', [
+        waiter,
+        blocker,
+      ])
+    ).rows[0];
+    if (row.blocked) return 'blocked';
+  }
+  throw new Error('Expected real database lock wait or request completion');
+}
+const userLockQuery = (sql: string) =>
+  /from\s+"user"/i.test(sql) && /for update/i.test(sql);
+function requestFor(path: string, body: unknown, cookie = '') {
+  return new Request(`${origin}${path}`, {
+    method: path === '/api/me/account' ? 'DELETE' : 'POST',
+    headers: { origin, cookie, 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+async function raceIdentity(label: string) {
+  const address = `${label}-${suffix}@test.invalid`;
+  expect(
+    (await post('/api/auth/sign-up/email', { email: address, password }))
+      .status,
+  ).toBe(200);
+  expect(
+    (
+      await post('/api/auth/verify-email', {
+        token: await mail('verify', address),
+      })
+    ).status,
+  ).toBe(200);
+  const login = await post('/api/auth/sign-in/email', {
+    email: address,
+    password,
+  });
+  expect(login.status).toBe(200);
+  expect(
+    (await post('/api/auth/request-password-reset', { email: address })).status,
+  ).toBe(200);
+  return {
+    email: address,
+    cookie: sessionCookie(login),
+    token: await mail('reset', address),
+    id: (await db.query('SELECT id FROM "user" WHERE email=$1', [address]))
+      .rows[0].id,
+  };
+}
 describe('real Better Auth and Mailpit account lifecycle', () => {
   beforeAll(async () => {
     for (const method of ['log', 'warn', 'error', 'info', 'debug'] as const)
@@ -818,5 +961,221 @@ describe('real Better Auth and Mailpit account lifecycle', () => {
         )
       ).status,
     ).toBe(429);
+  });
+  describe('account lock protocol interleavings', () => {
+    it('keeps expired session discovery read-only for maintenance cleanup', async () => {
+      const identity = await raceIdentity('expired-discovery');
+      await db.query(
+        "UPDATE session SET expires_at=now()-interval '1 second' WHERE user_id=$1",
+        [identity.id],
+      );
+      const holder = await pool.connect(),
+        probe = controlledService({});
+      let read: Promise<Response> | undefined,
+        resolution = '';
+      try {
+        await holder.query('BEGIN');
+        await holder.query(
+          'SELECT id FROM session WHERE user_id=$1 FOR UPDATE',
+          [identity.id],
+        );
+        const holderPid = (await holder.query('SELECT pg_backend_pid() pid'))
+          .rows[0].pid;
+        read = probe.service.handle(
+          new Request(`${origin}/api/me/account`, {
+            headers: { cookie: identity.cookie },
+          }),
+        );
+        resolution = await resolvedOrBlocked(
+          read,
+          await within(probe.pid.promise, 'Guard connection missing'),
+          holderPid,
+        );
+      } finally {
+        await holder.query('ROLLBACK');
+        holder.release();
+      }
+      expect((await read!).status).toBe(401);
+      expect(resolution).toBe('completed');
+      expect(
+        (
+          await db.query(
+            'SELECT count(*)::int n FROM session WHERE user_id=$1',
+            [identity.id],
+          )
+        ).rows[0].n,
+      ).toBe(1);
+    }, 30000);
+    it('never leaves an old-password login session alive after a concurrent reset', async () => {
+      const identity = await raceIdentity('login-race');
+      const login = controlledService({
+        after: (sql) => /select/i.test(sql) && /from\s+"account"/i.test(sql),
+      });
+      const reset = controlledService({});
+      const loginResult = login.service.handle(
+        requestFor('/api/auth/sign-in/email', {
+          email: identity.email,
+          password,
+        }),
+      );
+      let resetResult: Promise<Response> | undefined;
+      try {
+        await within(
+          login.reached.promise,
+          'Library credential read was not reached',
+        );
+        resetResult = reset.service.handle(
+          requestFor('/api/auth/reset-password', {
+            token: identity.token,
+            newPassword: password + 'changed',
+          }),
+        );
+        await resolvedOrBlocked(
+          resetResult,
+          await within(reset.pid.promise, 'Reset connection missing'),
+          await login.pid.promise,
+        );
+      } finally {
+        login.release.resolve();
+      }
+      const signedIn = await loginResult,
+        changed = await resetResult!;
+      expect(changed.status).toBe(200);
+      expect([200, 401]).toContain(signedIn.status);
+      if (signedIn.status === 200) {
+        const probe = await service.handle(
+          new Request(`${origin}/api/me/account`, {
+            headers: { cookie: sessionCookie(signedIn) },
+          }),
+        );
+        expect(probe.status).toBe(401);
+      }
+      expect(
+        (
+          await db.query(
+            'SELECT count(*)::int n FROM session WHERE user_id=$1',
+            [identity.id],
+          )
+        ).rows[0].n,
+      ).toBe(0);
+    }, 30000);
+    it('serializes reset behind deletion without a token/user lock inversion or HTTP500', async () => {
+      const identity = await raceIdentity('delete-race');
+      const deletion = controlledService({ after: userLockQuery }),
+        reset = controlledService({});
+      const deleted = deletion.service.handle(
+        requestFor('/api/me/account', { password }, identity.cookie),
+      );
+      let changed: Promise<Response> | undefined;
+      try {
+        await within(
+          deletion.reached.promise,
+          'Deletion account lock was not reached',
+        );
+        changed = reset.service.handle(
+          requestFor('/api/auth/reset-password', {
+            token: identity.token,
+            newPassword: password + 'changed',
+          }),
+        );
+        expect(
+          await resolvedOrBlocked(
+            changed,
+            await within(reset.pid.promise, 'Reset connection missing'),
+            await deletion.pid.promise,
+          ),
+        ).toBe('blocked');
+      } finally {
+        deletion.release.resolve();
+      }
+      const results = await Promise.all([deleted, changed!]);
+      expect(results.map((response) => response.status)).toEqual([200, 400]);
+      expect(
+        (
+          await db.query('SELECT count(*)::int n FROM "user" WHERE id=$1', [
+            identity.id,
+          ])
+        ).rows[0].n,
+      ).toBe(0);
+    }, 30000);
+    it('rejects an old-password login queued behind a reset account lock', async () => {
+      const identity = await raceIdentity('reset-first');
+      const reset = controlledService({ after: userLockQuery }),
+        login = controlledService({});
+      const changed = reset.service.handle(
+        requestFor('/api/auth/reset-password', {
+          token: identity.token,
+          newPassword: password + 'changed',
+        }),
+      );
+      let signedIn: Promise<Response> | undefined;
+      try {
+        await within(
+          reset.reached.promise,
+          'Reset account lock was not reached',
+        );
+        signedIn = login.service.handle(
+          requestFor('/api/auth/sign-in/email', {
+            email: identity.email,
+            password,
+          }),
+        );
+        expect(
+          await resolvedOrBlocked(
+            signedIn,
+            await within(login.pid.promise, 'Login connection missing'),
+            await reset.pid.promise,
+          ),
+        ).toBe('blocked');
+      } finally {
+        reset.release.resolve();
+      }
+      const results = await Promise.all([changed, signedIn!]);
+      expect(results.map((response) => response.status)).toEqual([200, 401]);
+      expect(
+        (
+          await db.query(
+            'SELECT count(*)::int n FROM session WHERE user_id=$1',
+            [identity.id],
+          )
+        ).rows[0].n,
+      ).toBe(0);
+    }, 30000);
+    it('keeps initial session discovery read-only when a due refresh overlaps reset', async () => {
+      const identity = await raceIdentity('refresh-race');
+      await db.query(
+        "UPDATE session SET created_at=now()-interval '2 days',updated_at=now()-interval '2 days',expires_at=now()+interval '5 days' WHERE user_id=$1",
+        [identity.id],
+      );
+      const guard = controlledService({ before: userLockQuery }),
+        reset = controlledService({});
+      const read = guard.service.handle(
+        new Request(`${origin}/api/me/account`, {
+          headers: { cookie: identity.cookie },
+        }),
+      );
+      let changed: Promise<Response> | undefined;
+      try {
+        await within(
+          guard.reached.promise,
+          'Guard account lock boundary was not reached',
+        );
+        changed = reset.service.handle(
+          requestFor('/api/auth/reset-password', {
+            token: identity.token,
+            newPassword: password + 'changed',
+          }),
+        );
+        await resolvedOrBlocked(
+          changed,
+          await within(reset.pid.promise, 'Reset connection missing'),
+          await guard.pid.promise,
+        );
+      } finally {
+        guard.release.resolve();
+      }
+      const results = await Promise.all([changed!, read]);
+      expect(results.map((response) => response.status)).toEqual([200, 401]);
+    }, 30000);
   });
 });

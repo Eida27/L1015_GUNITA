@@ -86,6 +86,10 @@ export function createLibrary(
       expiresIn: 604800,
       freshAge: 300,
       cookieCache: { enabled: false },
+      // Fixed seven-day sessions. GET identity discovery must never refresh or
+      // delete expired rows before the account-first authorization lock.
+      disableSessionRefresh: true,
+      deferSessionRefresh: true,
     },
     user: { changeEmail: { enabled: false }, deleteUser: { enabled: false } },
     databaseHooks: {
