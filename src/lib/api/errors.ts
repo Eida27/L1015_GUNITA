@@ -1,4 +1,19 @@
 const errors = {
+  GUIDELINES_REQUIRED: {
+    status: 403,
+    message: 'Accept the current Community Guidelines before publishing.',
+  },
+  POST_LIMIT_REACHED: {
+    status: 429,
+    message:
+      'You can leave five thoughts in a rolling 24 hours. Please come back later.',
+  },
+  THOUGHT_UNAVAILABLE: { status: 404, message: 'This thought is unavailable.' },
+  CONTENT_REJECTED: {
+    status: 422,
+    message:
+      'Please remove contact details, links, threats or harmful instructions.',
+  },
   UNAUTHENTICATED: { status: 401, message: 'Sign in to continue.' },
   INVALID_CREDENTIALS: {
     status: 401,

@@ -11,6 +11,8 @@ import {
 } from './map-engine';
 import type { MessageKey } from '@/lib/i18n/catalog';
 import { MapGroup } from './map-group';
+import { Composer } from '@/components/thoughts/composer';
+import { ThoughtDetail } from '@/components/thoughts/thought-detail';
 
 const emotionKeys: Record<string, MessageKey> = {
   love: 'Love',
@@ -32,6 +34,8 @@ export default function MapView({ signal }: { signal: AbortSignal }) {
   const [emotion, setEmotion] = useState('');
   const emotionRef = useRef('');
   const [picking, setPicking] = useState(false);
+  const [composing, setComposing] = useState(false);
+  const pickedLocation = useRef<{ lat: number; lng: number } | null>(null);
   const pickingRef = useRef(false);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>(
     'loading',
@@ -58,6 +62,8 @@ export default function MapView({ signal }: { signal: AbortSignal }) {
     setPickStatus('loading');
     setPreview(null);
     safePreview.current = null;
+    pickedLocation.current = null;
+    engine.current?.clearPreview();
     try {
       if (!store.isAcknowledged()) return;
       const response = await fetch('/api/map/preview', {
@@ -76,6 +82,7 @@ export default function MapView({ signal }: { signal: AbortSignal }) {
       if (combined.aborted || !store.isAcknowledged()) return;
       setPreview(point);
       safePreview.current = point;
+      pickedLocation.current = { lat, lng };
       setPickStatus('idle');
       engine.current?.preview(point);
     } catch {
@@ -90,11 +97,12 @@ export default function MapView({ signal }: { signal: AbortSignal }) {
     if (!container.current || !store.isAcknowledged()) return;
     const controller = new AbortController();
     const combined = AbortSignal.any([signal, controller.signal]);
+    const initialPreview = safePreview.current;
     void createMapEngine({
       container: container.current,
       locale,
       camera: camera.current,
-      preview: safePreview.current,
+      preview: initialPreview,
       signal: combined,
       allowed: store.isAcknowledged,
       emotion: () => emotionRef.current,
@@ -106,7 +114,15 @@ export default function MapView({ signal }: { signal: AbortSignal }) {
       onPick: (lat, lng) => void pickRef.current(lat, lng),
     })
       .then((value) => {
-        if (!combined.aborted) engine.current = value;
+        if (!combined.aborted) {
+          engine.current = value;
+          // A pick may finish while style discovery is pending. Apply only a
+          // newer selection here; a locale reload must preserve its camera.
+          if (safePreview.current !== initialPreview) {
+            if (safePreview.current) value.preview(safePreview.current);
+            else value.clearPreview();
+          }
+        }
       })
       .catch(() => {
         if (!combined.aborted && store.isAcknowledged()) setStatus('error');
@@ -139,6 +155,15 @@ export default function MapView({ signal }: { signal: AbortSignal }) {
         </button>
       </div>
       <div className="map-toolbar">
+        <button
+          onClick={() => {
+            setComposing(true);
+            setPicking(true);
+            pickingRef.current = true;
+          }}
+        >
+          {t('Leave a thought')}
+        </button>
         <label>
           {t('Emotion')}
           <select
@@ -277,6 +302,33 @@ export default function MapView({ signal }: { signal: AbortSignal }) {
           ) : null}
         </section>
       ) : null}
+      {composing ? (
+        <Composer
+          signal={signal}
+          point={preview}
+          location={() => pickedLocation.current}
+          onClose={() => setComposing(false)}
+          onPublished={(thought) => {
+            setComposing(false);
+            setPicking(false);
+            pickingRef.current = false;
+            pickedLocation.current = null;
+            setPreview(null);
+            safePreview.current = null;
+            engine.current?.clearPreview();
+            setSelected({
+              key: thought.publicId,
+              publicId: thought.publicId,
+              emotion: thought.emotion,
+              label: thought.location.label,
+              count: 1,
+              lng: thought.location.lng,
+              lat: thought.location.lat,
+            });
+            void engine.current?.refresh();
+          }}
+        />
+      ) : null}
       <details className="visible-markers" open>
         <summary>{t('Visible places and feelings')}</summary>
         <p>
@@ -329,6 +381,9 @@ export default function MapView({ signal }: { signal: AbortSignal }) {
           </h2>
           <p>{selected.label}</p>
           <p>{t('Locations are approximate.')}</p>
+          {selected.publicId ? (
+            <ThoughtDetail publicId={selected.publicId} signal={signal} />
+          ) : null}
           <button onClick={() => setSelected(null)}>{t('Close')}</button>
         </Dialog>
       ) : null}

@@ -4,6 +4,7 @@ import { Dialog } from '@/components/ui/dialog';
 import { usePreferences } from '@/components/ui/preferences';
 import type { MapMember, MapMembers } from '@/lib/map-contract';
 import type { MessageKey } from '@/lib/i18n/catalog';
+import { ThoughtDetail } from '@/components/thoughts/thought-detail';
 
 const emotionKeys: Record<MapMember['emotion'], MessageKey> = {
   love: 'Love',
@@ -39,6 +40,7 @@ export function MapGroup({
   const lastSelected = useRef<string | null>(null);
   const list = useRef<HTMLUListElement>(null);
   const selectedTitle = useRef<HTMLHeadingElement>(null);
+  const paginationFocus = useRef(false);
   const after = cursors[page];
   useEffect(() => {
     const controller = new AbortController();
@@ -76,8 +78,17 @@ export function MapGroup({
       target?.focus();
     }
   }, [selected]);
+  useEffect(() => {
+    if (result && paginationFocus.current) {
+      list.current
+        ?.querySelector<HTMLButtonElement>('button[data-public-id]')
+        ?.focus();
+      paginationFocus.current = false;
+    }
+  }, [result]);
   function move(next: number) {
     if (signal.aborted || !store.isAcknowledged()) return;
+    paginationFocus.current = true;
     setResult(null);
     setStatus('loading');
     setPage(next);
@@ -92,6 +103,7 @@ export function MapGroup({
           </h3>
           <p>{selected.label}</p>
           <p>{t('Locations are approximate.')}</p>
+          <ThoughtDetail publicId={selected.publicId} signal={signal} />
           <button onClick={() => setSelected(null)}>
             {t('Back to this group')}
           </button>

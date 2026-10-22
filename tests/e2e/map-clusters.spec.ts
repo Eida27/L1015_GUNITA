@@ -107,13 +107,18 @@ test('terminal colocated thoughts are individually reachable in bounded pages be
       await expect(page.getByRole('dialog')).toContainText(
         'Locations are approximate.',
       );
+      await expect(
+        page.getByRole('dialog').locator('.thought-body'),
+      ).toHaveText('Clearly fictional local map fixture');
       await page
         .getByRole('button', { name: 'Back to this group', exact: true })
         .click();
       await expect(choice).toBeFocused();
     }
-    if (size === 20)
+    if (size === 20) {
       await page.getByRole('button', { name: 'Next', exact: true }).click();
+      await expect(choices.first()).toBeFocused();
+    }
   }
   expect(ids.size).toBe(21);
   await expect(
@@ -209,6 +214,9 @@ test('real server aggregates and client clusters conserve weights, zoom and sele
   await page.keyboard.press('Enter');
   await expect(page.getByRole('dialog')).toContainText(
     'Locations are approximate.',
+  );
+  await expect(page.getByRole('dialog').locator('.thought-body')).toHaveText(
+    'Clearly fictional local map fixture',
   );
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);

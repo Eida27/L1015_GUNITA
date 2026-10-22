@@ -14,6 +14,13 @@ export function browserLocale(languages: readonly string[]): Locale {
 }
 // API messages are never displayed directly: only known, allowlisted codes.
 export const errorKeys = {
+  GUIDELINES_REQUIRED:
+    'Accept the current Community Guidelines before publishing.',
+  POST_LIMIT_REACHED:
+    'You can leave five thoughts in a rolling 24 hours. Please come back later.',
+  THOUGHT_UNAVAILABLE: 'This thought is unavailable.',
+  CONTENT_REJECTED:
+    'Please remove contact details, links, threats or harmful instructions.',
   UNAUTHENTICATED: 'Sign in to continue.',
   INVALID_CREDENTIALS: 'Email or password is incorrect.',
   EMAIL_UNVERIFIED: 'Verify your email before continuing.',

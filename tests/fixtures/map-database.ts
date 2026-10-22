@@ -7,7 +7,7 @@ import { seedGeo } from '../../src/server/db/seed-geo.mjs';
 import { provisionRoles, grantRuntime } from '../../src/server/db/roles.mjs';
 
 // Only tests import this module. Never creates fixtures in the configured database.
-export async function createMapDatabase() {
+export async function createMapDatabase({ maxConnections = 1 } = {}) {
   loadLocalEnv();
   loadDatabaseEnv();
   const suffix = randomBytes(8).toString('hex');
@@ -40,7 +40,10 @@ export async function createMapDatabase() {
   await seedGeo(operator);
   await grantRuntime(operator, runtimeRole);
   url.username = runtimeRole;
-  const pool = new pg.Pool({ connectionString: url.toString(), max: 1 });
+  const pool = new pg.Pool({
+    connectionString: url.toString(),
+    max: maxConnections,
+  });
   return {
     operator,
     pool,

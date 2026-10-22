@@ -112,6 +112,78 @@ try {
     );
   }
   await mkdir('.local', { recursive: true });
+  if (process.env.GUNITA_THOUGHT_FIXTURE === 'synthetic-only') {
+    const identity = {
+      email: `thought-browser-${randomBytes(8).toString('hex')}@test.invalid`,
+      password: randomBytes(24).toString('hex'),
+    };
+    const post = (path, method, body, cookie = '') =>
+      fetch(origin + path, {
+        method,
+        headers: { origin, cookie, 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    if (!(await post('/api/auth/sign-up/email', 'POST', identity)).ok)
+      throw new Error('Synthetic registration failed');
+    await fixture.operator.query(
+      'UPDATE "user" SET email_verified=true WHERE email=$1',
+      [identity.email],
+    );
+    const login = await post('/api/auth/sign-in/email', 'POST', identity);
+    if (!login.ok) throw new Error('Synthetic login failed');
+    const cookie = login.headers
+      .getSetCookie()
+      .map((value) => value.split(';')[0])
+      .join('; ');
+    if (
+      !(
+        await post(
+          '/api/me/consent',
+          'PUT',
+          { version: 'guidelines-2026-10-19' },
+          cookie,
+        )
+      ).ok
+    )
+      throw new Error('Synthetic consent failed');
+    const published = await post(
+      '/api/thoughts',
+      'POST',
+      {
+        body: 'Clearly fictional: a little hope for the morning.',
+        emotion: 'hope',
+        location: { lat: 14.5995, lng: 120.9842 },
+      },
+      cookie,
+    );
+    if (!published.ok) throw new Error('Synthetic publication failed');
+    const thought = await published.json();
+    // Only the disposable automated lifecycle exercises a fresh agreement.
+    // The retained controller fixture keeps its established consent.
+    const needsAgreement =
+      process.env.GUNITA_THOUGHT_REAGREE === 'synthetic-only';
+    if (needsAgreement)
+      await fixture.operator.query(
+        'DELETE FROM user_consents WHERE user_id=(SELECT id FROM "user" WHERE email=$1)',
+        [identity.email],
+      );
+    await writeFile(
+      `.local/phase-5-browser-fixture-${port}.json`,
+      JSON.stringify({
+        ...identity,
+        url: origin,
+        thoughtUrl: `${origin}/thought/${thought.publicId}`,
+        publicId: thought.publicId,
+        database: fixture.name,
+        pid: process.pid,
+        appPid: child.pid,
+        mode: 'LOCAL_PREVIEW',
+        consentVersion: 'guidelines-2026-10-19',
+        needsAgreement,
+      }),
+    );
+    await post('/api/auth/sign-out', 'POST', {}, cookie);
+  }
   await writeFile(
     `.local/phase-4-fixture-${port}.json`,
     JSON.stringify({
@@ -119,11 +191,12 @@ try {
       appPid: child.pid,
       url: origin,
       database: fixture.name,
-      thoughts: 60,
+      thoughts:
+        process.env.GUNITA_THOUGHT_FIXTURE === 'synthetic-only' ? 61 : 60,
     }),
   );
   console.log(
-    `Disposable map fixture ready at ${origin}; app PID ${child.pid}; 60 fictional thoughts.`,
+    `Disposable map fixture ready at ${origin}; app PID ${child.pid}; ${process.env.GUNITA_THOUGHT_FIXTURE === 'synthetic-only' ? 61 : 60} fictional thoughts.`,
   );
   process.send?.({ ready: true, url: origin });
 } catch {

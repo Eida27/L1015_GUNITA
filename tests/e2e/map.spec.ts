@@ -12,14 +12,16 @@ test('actual map waits for acknowledgment, renders world and focuses PH', async 
   await expect(page.getByRole('dialog')).toBeVisible();
   expect(requests).toEqual([]);
   await page.getByRole('checkbox').check();
+  const pins = page.waitForResponse(
+    (response) => response.url().includes('/api/map/pins'),
+    { timeout: 30000 },
+  );
   await page.getByRole('button', { name: 'Enter Gunita' }).click();
   await expect(page.getByTestId('map-view')).toBeVisible();
   await expect(
     page.getByRole('button', { name: 'Explore thoughts in the Philippines' }),
   ).toBeVisible();
-  await expect
-    .poll(() => requests.some((url) => url.includes('/api/map/pins')))
-    .toBe(true);
+  expect((await pins).status()).toBe(200);
   await page
     .getByRole('button', { name: 'Explore thoughts in the Philippines' })
     .click();

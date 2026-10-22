@@ -900,3 +900,25 @@ button {
     scroll-behavior: auto;
   }
 }
+/* Authored text is always plain text, including HTML/Markdown-looking input. */
+.thought-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.thought-detail,
+.composer {
+  max-width: 42rem;
+  margin-block: 1.5rem;
+}
+.composer textarea,
+.thought-detail textarea {
+  width: 100%;
+  min-height: 8rem;
+  resize: vertical;
+  font: inherit;
+  padding: 0.8rem;
+  color: var(--ink);
+  background: var(--canvas);
+  border: 1px solid currentColor;
+  border-radius: 0.5rem;
+}

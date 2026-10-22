@@ -27,6 +27,7 @@
     "db:migrate": "node scripts/db.mjs migrate",
     "db:seed:geo": "node scripts/db.mjs seed",
     "maintenance:expire": "node scripts/db.mjs expire",
+    "maintenance:run": "node scripts/maintenance.mjs",
     "test:integration": "vitest run tests/integration"
   },
   "dependencies": {

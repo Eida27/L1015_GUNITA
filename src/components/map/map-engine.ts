@@ -76,6 +76,8 @@ export async function createMapEngine(options: {
   let timer: ReturnType<typeof setTimeout>;
   let request: AbortController | undefined;
   let loaded = false;
+  // Keep safe preview updates that arrive before the style/source is ready.
+  let currentPreview = options.preview ?? null;
   function marker(feature: MapGeoJSONFeature): DisplayMarker | null {
     if (feature.geometry.type !== 'Point') return null;
     const p = feature.properties;
@@ -239,13 +241,13 @@ export async function createMapEngine(options: {
       type: 'geojson',
       data: {
         type: 'FeatureCollection',
-        features: options.preview
+        features: currentPreview
           ? [
               {
                 type: 'Feature',
                 geometry: {
                   type: 'Point',
-                  coordinates: [options.preview.lng, options.preview.lat],
+                  coordinates: [currentPreview.lng, currentPreview.lat],
                 },
                 properties: {},
               },
@@ -294,10 +296,12 @@ export async function createMapEngine(options: {
     if (active()) options.onStatus('error');
   };
   const online = () => void refresh();
+  const refreshTimer = setInterval(() => void refresh(), 30000);
   window.addEventListener('offline', offline);
   window.addEventListener('online', online);
   const dispose = () => {
     clearTimeout(timer);
+    clearInterval(refreshTimer);
     request?.abort();
     window.removeEventListener('offline', offline);
     window.removeEventListener('online', online);
@@ -328,7 +332,15 @@ export async function createMapEngine(options: {
     center() {
       return map.getCenter();
     },
+    clearPreview() {
+      currentPreview = null;
+      (map.getSource('preview') as GeoJSONSource)?.setData({
+        type: 'FeatureCollection',
+        features: [],
+      });
+    },
     preview(point: CoarsePreview) {
+      currentPreview = point;
       (map.getSource('preview') as GeoJSONSource)?.setData({
         type: 'FeatureCollection',
         features: [

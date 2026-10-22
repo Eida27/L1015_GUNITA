@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import pg from 'pg';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, createHmac } from 'node:crypto';
 import { loadLocalEnv } from '../../scripts/load-env.mjs';
 import { loadDatabaseEnv } from '../../scripts/database-env.mjs';
 import { migrate } from '../../src/server/db/migrate.mjs';
@@ -843,29 +843,89 @@ describe('real Better Auth and Mailpit account lifecycle', () => {
   });
   it('durably throttles wrong credentials across service instances and ignores spoofed forwarding', async () => {
     const address = `limit-${suffix}@test.invalid`;
-    for (let attempt = 0; attempt < 10; attempt++)
-      expect(
-        (await post('/api/auth/sign-in/email', { email: address, password }))
-          .status,
-      ).toBe(401);
+    const observed = new Map<string, { count: number; window_start: Date }>();
+    const observeAttempt = async (
+      bucket: string,
+      action: string,
+      response: Response,
+      cap: number,
+      allowed: number,
+    ) => {
+      const current = (
+        await db.query(
+          'SELECT count,window_start FROM rate_limit_counters WHERE bucket_hmac=$1 AND route_group=$2 ORDER BY window_start DESC LIMIT 1',
+          [bucket, `auth:${action}`],
+        )
+      ).rows[0];
+      const previous = observed.get(bucket);
+      const sameWindow =
+        previous?.window_start.getTime() === current.window_start.getTime();
+      expect(current.count).toBe(sameWindow ? previous!.count + 1 : 1);
+      expect(response.status).toBe(current.count <= cap ? allowed : 429);
+      observed.set(bucket, current);
+      return current;
+    };
+    const loginBucket = createHmac('sha256', authSecret)
+      .update(`auth:v1:email:${address}`)
+      .digest('hex');
+    let firstLoginWindow = 0;
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const response = await post('/api/auth/sign-in/email', {
+        email: address,
+        password,
+      });
+      expect(response.status).toBe(401);
+      const state = await observeAttempt(
+        loginBucket,
+        'sign-in/email',
+        response,
+        10,
+        401,
+      );
+      if (attempt === 0) firstLoginWindow = state.window_start.getTime();
+    }
     const restarted = createAuthService({
       pool,
       origin,
       secret: authSecret,
       smtpPort: 1028,
     });
-    const denied = await restarted.handle(
-      new Request(`${origin}/api/auth/sign-in/email`, {
-        method: 'POST',
-        headers: {
-          origin,
-          'content-type': 'application/json',
-          'x-forwarded-for': '8.8.8.8',
-        },
-        body: JSON.stringify({ email: address, password }),
-      }),
+    const repeatedLogin = () =>
+      restarted.handle(
+        new Request(`${origin}/api/auth/sign-in/email`, {
+          method: 'POST',
+          headers: {
+            origin,
+            'content-type': 'application/json',
+            'x-forwarded-for': '8.8.8.8',
+          },
+          body: JSON.stringify({ email: address, password }),
+        }),
+      );
+    let denied = await repeatedLogin();
+    let loginState = await observeAttempt(
+      loginBucket,
+      'sign-in/email',
+      denied,
+      10,
+      401,
     );
+    // Fixed windows legitimately reset while these real scrypt/SMTP requests
+    // run. Extra successes are valid only in a different persisted window.
+    for (let extra = 0; denied.status !== 429 && extra < 10; extra++) {
+      expect(loginState.window_start.getTime()).not.toBe(firstLoginWindow);
+      expect(denied.status).toBe(401);
+      denied = await repeatedLogin();
+      loginState = await observeAttempt(
+        loginBucket,
+        'sign-in/email',
+        denied,
+        10,
+        401,
+      );
+    }
     expect(denied.status).toBe(429);
+    expect(loginState.count).toBe(11);
     // Share the same service secret in both fresh instances, as a real restart does.
     const one = createAuthService({
       pool,
@@ -890,10 +950,47 @@ describe('real Better Auth and Mailpit account lifecycle', () => {
         },
         body: JSON.stringify({ email: address }),
       });
-    for (let i = 0; i < 5; i++)
-      expect((await one.handle(request())).status).toBe(200);
-    const limited = await two.handle(request());
+    const resetBucket = createHmac(
+      'sha256',
+      'limit-fixture-secret-with-at-least-32-characters',
+    )
+      .update(`auth:v1:email:${address}`)
+      .digest('hex');
+    let firstResetWindow = 0;
+    for (let i = 0; i < 5; i++) {
+      const response = await one.handle(request());
+      expect(response.status).toBe(200);
+      const state = await observeAttempt(
+        resetBucket,
+        'request-password-reset',
+        response,
+        5,
+        200,
+      );
+      if (i === 0) firstResetWindow = state.window_start.getTime();
+    }
+    let limited = await two.handle(request());
+    let resetState = await observeAttempt(
+      resetBucket,
+      'request-password-reset',
+      limited,
+      5,
+      200,
+    );
+    for (let extra = 0; limited.status !== 429 && extra < 5; extra++) {
+      expect(resetState.window_start.getTime()).not.toBe(firstResetWindow);
+      expect(limited.status).toBe(200);
+      limited = await two.handle(request());
+      resetState = await observeAttempt(
+        resetBucket,
+        'request-password-reset',
+        limited,
+        5,
+        200,
+      );
+    }
     expect(limited.status).toBe(429);
+    expect(resetState.count).toBe(6);
     expect(
       (
         await db.query(
@@ -901,6 +998,42 @@ describe('real Better Auth and Mailpit account lifecycle', () => {
         )
       ).rows[0],
     ).toEqual({ safe: true, ttl: true });
+  }, 30000);
+  it('uses the actual new DB window after a saturated previous window and enforces the new budget across restart', async () => {
+    const address = `boundary-${suffix}@test.invalid`;
+    const secret = 'boundary-fixture-secret-with-at-least-32-characters';
+    const bucket = createHmac('sha256', secret)
+      .update(`auth:v1:email:${address}`)
+      .digest('hex');
+    await db.query(
+      `INSERT INTO rate_limit_counters(bucket_hmac,route_group,window_start,count,expires_at)
+      VALUES($1,'auth:request-password-reset',to_timestamp(floor(extract(epoch from statement_timestamp())/900)*900)-interval '15 minutes',5,to_timestamp(floor(extract(epoch from statement_timestamp())/900)*900))`,
+      [bucket],
+    );
+    const first = createAuthService({ pool, origin, secret, smtpPort: 1028 });
+    const next = createAuthService({ pool, origin, secret, smtpPort: 1028 });
+    const request = () =>
+      new Request(`${origin}/api/auth/request-password-reset`, {
+        method: 'POST',
+        headers: { origin, 'content-type': 'application/json' },
+        body: JSON.stringify({ email: address }),
+      });
+    expect((await first.handle(request())).status).toBe(200);
+    const observed = await db.query(
+      "SELECT count,expires_at<=statement_timestamp() AS old FROM rate_limit_counters WHERE bucket_hmac=$1 AND route_group='auth:request-password-reset' ORDER BY window_start",
+      [bucket],
+    );
+    expect(observed.rows).toEqual([
+      { count: 5, old: true },
+      { count: 1, old: false },
+    ]);
+    // Fill only this real current window; the next request must use the DB
+    // counter even in a fresh service instance. No library/clock is mocked.
+    await db.query(
+      'UPDATE rate_limit_counters SET count=5 WHERE bucket_hmac=$1 AND expires_at>statement_timestamp()',
+      [bucket],
+    );
+    expect((await next.handle(request())).status).toBe(429);
   }, 30000);
   it('serializes duplicate signup races without partial accounts or enumeration responses', async () => {
     const address = `race-${suffix}@test.invalid`;

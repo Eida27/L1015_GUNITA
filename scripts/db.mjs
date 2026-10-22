@@ -5,7 +5,7 @@ import { loadDatabaseEnv, prepareLocalDatabaseEnv } from './database-env.mjs';
 import { provisionRoles, grantRuntime } from '../src/server/db/roles.mjs';
 import { migrate } from '../src/server/db/migrate.mjs';
 import { seedGeo } from '../src/server/db/seed-geo.mjs';
-import { cleanupExpired } from '../src/server/db/cleanup.mjs';
+import { runMaintenance } from '../src/server/db/maintenance.mjs';
 
 const command = process.argv[2];
 async function connection(url, fn) {
@@ -58,7 +58,7 @@ try {
     if (command === 'prepare' || command === 'seed')
       console.log(`Geographic areas imported: ${await seedGeo(client)}.`);
     if (command === 'expire')
-      console.log(JSON.stringify(await cleanupExpired(client)));
+      console.log(JSON.stringify(await runMaintenance(client)));
   });
 } catch {
   // pg errors may carry SQL/detail/body values. Never print those objects.
