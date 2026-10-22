@@ -1,16 +1,19 @@
 import 'server-only';
 import type { Pool } from 'pg';
-import { emotions, type MapPins } from '@/lib/map-contract';
+import {
+  emotions,
+  type MapPins,
+  type MapMembers,
+  type MapMember,
+} from '@/lib/map-contract';
 import { publishedPredicate } from '../db/published.mjs';
 export class MapInputError extends Error {}
-export async function queryMapPins(
-  db: Pick<Pool, 'query'>,
-  query: URLSearchParams,
-): Promise<MapPins> {
+function parseViewport(query: URLSearchParams, members = false) {
+  const allowed = members
+    ? ['bbox', 'zoom', 'emotion', 'group', 'after']
+    : ['bbox', 'zoom', 'emotion'];
   if (
-    [...query.keys()].some(
-      (key) => !['bbox', 'zoom', 'emotion'].includes(key),
-    ) ||
+    [...query.keys()].some((key) => !allowed.includes(key)) ||
     [...query.keys()].some((key) => query.getAll(key).length !== 1)
   )
     throw new MapInputError();
@@ -50,8 +53,10 @@ export async function queryMapPins(
     width / 30,
     (north - south) / 30,
   );
-  const { rows } = await db.query(
-    `WITH visible AS MATERIALIZED (
+  return { zoom, parameters: [west, south, east, north, emotion, step] };
+}
+// Both discovery paths use exactly the same viewport, filter and publication boundary.
+const visibleBins = `WITH visible AS MATERIALIZED (
       SELECT t.public_id,t.emotion,t.location_label,ST_X(t.public_point) AS x,ST_Y(t.public_point) AS y
       FROM thoughts t WHERE ${publishedPredicate}
       AND ($5::emotion IS NULL OR t.emotion=$5::emotion)
@@ -59,12 +64,21 @@ export async function queryMapPins(
         THEN t.public_point && ST_MakeEnvelope($1,$2,$3,$4,4326)
         ELSE (t.public_point && ST_MakeEnvelope($1,$2,180,$4,4326)
           OR t.public_point && ST_MakeEnvelope(-180,$2,$3,$4,4326)) END
-    ), grouped AS (
-      SELECT floor((CASE WHEN x<$1 THEN x+360 ELSE x END-$1)/$6) AS gx,
-        floor((y-$2)/$6) AS gy, count(*)::int AS count,
-        min(public_id) AS representative FROM visible GROUP BY 1,2
-    ) SELECT g.count,v.* FROM grouped g JOIN visible v ON v.public_id=g.representative ORDER BY g.gx,g.gy`,
-    [west, south, east, north, emotion, step],
+    ), binned AS (
+      SELECT *,floor((CASE WHEN x<$1 THEN x+360 ELSE x END-$1)/$6) AS gx,
+        floor((y-$2)/$6) AS gy FROM visible
+    )`;
+
+export async function queryMapPins(
+  db: Pick<Pool, 'query'>,
+  query: URLSearchParams,
+): Promise<MapPins> {
+  const { zoom, parameters } = parseViewport(query);
+  const { rows } = await db.query(
+    `${visibleBins}, grouped AS (
+      SELECT gx,gy,count(*)::int AS count,min(public_id) AS representative FROM binned GROUP BY gx,gy
+    ) SELECT g.count,g.gx,g.gy,v.* FROM grouped g JOIN visible v ON v.public_id=g.representative ORDER BY g.gx,g.gy`,
+    parameters,
   );
   return {
     type: 'FeatureCollection',
@@ -81,7 +95,45 @@ export async function queryMapPins(
               emotion: row.emotion,
               label: row.location_label,
             }
-          : { kind: 'aggregate', count: row.count },
+          : {
+              kind: 'aggregate',
+              count: row.count,
+              ...(zoom === 18 ? { group: `${row.gx}:${row.gy}` } : {}),
+            },
     })),
+  };
+}
+
+export async function queryMapMembers(
+  db: Pick<Pool, 'query'>,
+  query: URLSearchParams,
+): Promise<MapMembers> {
+  const { zoom, parameters } = parseViewport(query, true);
+  const group = query.get('group');
+  const after = query.get('after');
+  if (
+    zoom !== 18 ||
+    !group ||
+    !/^(?:[0-9]|[12][0-9]|30):(?:[0-9]|[12][0-9]|30)$/.test(group) ||
+    (after !== null && !/^t_[A-Za-z0-9_-]{22,64}$/.test(after))
+  )
+    throw new MapInputError();
+  const [gx, gy] = group.split(':').map(Number);
+  const { rows } = await db.query(
+    `${visibleBins}, members AS MATERIALIZED (
+      SELECT public_id,emotion,location_label FROM binned WHERE gx=$7 AND gy=$8
+    ), page AS (
+      SELECT public_id AS "publicId",emotion,location_label AS label FROM members
+      WHERE ($9::text IS NULL OR public_id>$9) ORDER BY public_id LIMIT 21
+    ) SELECT (SELECT count(*)::int FROM members) AS total,
+      COALESCE(json_agg(page ORDER BY page."publicId"),'[]'::json) AS members FROM page`,
+    [...parameters, gx, gy, after],
+  );
+  const page: MapMember[] = rows[0].members;
+  const members = page.slice(0, 20);
+  return {
+    total: rows[0].total,
+    members,
+    nextCursor: page.length > 20 ? members.at(-1)!.publicId : null,
   };
 }

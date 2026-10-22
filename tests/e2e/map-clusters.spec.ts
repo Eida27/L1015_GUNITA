@@ -30,6 +30,124 @@ test.beforeAll(async () => {
     }),
   ]);
 });
+
+test('terminal colocated thoughts are individually reachable in bounded pages behind acknowledgment', async ({
+  page,
+}) => {
+  test.setTimeout(120000);
+  const requests: string[] = [];
+  page.on('request', (request) => {
+    if (request.url().includes('/api/map/')) requests.push(request.url());
+  });
+  await page.goto(origin);
+  await expect(page.getByRole('dialog')).toBeVisible();
+  expect(requests).toEqual([]);
+  await page.getByRole('checkbox').check();
+  await page.getByRole('button', { name: 'Enter Gunita' }).click();
+  await expect(
+    page.locator('.visible-markers button[data-count]'),
+  ).not.toHaveCount(0, { timeout: 30000 });
+  await page
+    .getByRole('button', { name: 'Preview a place', exact: true })
+    .click();
+  await page
+    .getByText('Enter a location with the keyboard', { exact: true })
+    .click();
+  await page.getByLabel('Latitude', { exact: true }).fill('14.5995');
+  await page.getByLabel('Longitude', { exact: true }).fill('120.9842');
+  await page
+    .getByRole('button', { name: 'Preview approximate location', exact: true })
+    .click();
+  await expect(page.getByRole('status')).toContainText('Metro Manila');
+  await page
+    .getByRole('button', { name: 'Preview a place', exact: true })
+    .click();
+  for (let i = 0; i < 18; i++) {
+    const terminal = page.getByRole('button', {
+      name: /thoughts — choose one/,
+    });
+    if (await terminal.count()) break;
+    if (
+      await page
+        .getByRole('button', { name: 'Zoom in', exact: true })
+        .isDisabled()
+    )
+      break;
+    const response = page.waitForResponse((r) =>
+      r.url().includes('/api/map/pins?'),
+    );
+    await page.getByRole('button', { name: 'Zoom in', exact: true }).click();
+    await response;
+    await page.waitForTimeout(300);
+  }
+  const terminal = page
+    .getByRole('button', { name: /thoughts — choose one/ })
+    .first();
+  await expect(terminal).toHaveText('21 thoughts — choose one');
+  const memberResponse = page.waitForResponse((r) =>
+    r.url().includes('/api/map/members?'),
+  );
+  await terminal.click();
+  const first = await (await memberResponse).json();
+  expect(first.total).toBe(21);
+  expect(first.members).toHaveLength(20);
+  const ids = new Set<string>();
+  for (const size of [20, 1]) {
+    const choices = page.getByRole('dialog').locator('button[data-public-id]');
+    await expect(choices).toHaveCount(size);
+    for (let i = 0; i < size; i++) {
+      const choice = choices.nth(i);
+      const publicId = (await choice.getAttribute('data-public-id'))!;
+      ids.add(publicId);
+      await choice.click();
+      await expect(page.locator('[data-selected-public-id]')).toHaveAttribute(
+        'data-selected-public-id',
+        publicId,
+      );
+      await expect(page.getByRole('dialog')).toContainText(
+        'Locations are approximate.',
+      );
+      await page
+        .getByRole('button', { name: 'Back to this group', exact: true })
+        .click();
+      await expect(choice).toBeFocused();
+    }
+    if (size === 20)
+      await page.getByRole('button', { name: 'Next', exact: true }).click();
+  }
+  expect(ids.size).toBe(21);
+  await expect(
+    page.getByRole('button', { name: 'Next', exact: true }),
+  ).toBeDisabled();
+  await page.getByRole('button', { name: 'Previous', exact: true }).click();
+  await expect(
+    page.getByRole('dialog').locator('button[data-public-id]'),
+  ).toHaveCount(20);
+  // A real in-flight member response must never survive revoked acknowledgment.
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route('**/api/map/members?**', async (route) => {
+    await held;
+    await route.continue().catch(() => {});
+  });
+  const pending = page.waitForRequest((request) =>
+    request.url().includes('/api/map/members?'),
+  );
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
+  await pending;
+  await page.evaluate(() => localStorage.clear());
+  await expect(page.getByTestId('map-view')).toHaveCount(0);
+  const before = requests.length;
+  release();
+  await page.waitForTimeout(300);
+  expect(requests.length).toBe(before);
+  await expect(
+    page.getByRole('dialog').locator('button[data-public-id]'),
+  ).toHaveCount(0);
+  await page.unrouteAll({ behavior: 'wait' });
+});
 test.afterAll(async () => {
   if (fixture?.connected) {
     const exited = once(fixture, 'exit');

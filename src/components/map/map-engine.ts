@@ -26,6 +26,7 @@ export type DisplayMarker = {
   publicId?: string;
   emotion?: string;
   label?: string;
+  groupQuery?: string;
 };
 export async function createMapEngine(options: {
   container: HTMLElement;
@@ -39,6 +40,7 @@ export async function createMapEngine(options: {
   onMarkers: (markers: DisplayMarker[]) => void;
   onStatus: (status: 'loading' | 'ready' | 'error') => void;
   onSelect: (marker: DisplayMarker) => void;
+  onGroup: (query: string) => void;
   onPick: (lat: number, lng: number) => void;
 }) {
   const { signal, allowed } = options;
@@ -87,6 +89,7 @@ export async function createMapEngine(options: {
       publicId: p.publicId,
       emotion: p.emotion,
       label: p.label,
+      groupQuery: p.groupQuery,
     };
   }
   async function select(item: DisplayMarker) {
@@ -97,6 +100,8 @@ export async function createMapEngine(options: {
       ).getClusterExpansionZoom(item.clusterId);
       if (active())
         map.easeTo({ center: [item.lng, item.lat], zoom: Math.min(18, zoom) });
+    } else if (item.groupQuery) {
+      options.onGroup(item.groupQuery);
     } else if (item.count > 1) {
       map.easeTo({
         center: [item.lng, item.lat],
@@ -145,7 +150,22 @@ export async function createMapEngine(options: {
       if (!response.ok) throw new Error('Map unavailable');
       const data: MapPins = await response.json();
       if (!active() || requestSignal.aborted) return;
-      (map.getSource('thoughts') as GeoJSONSource).setData(data);
+      // Bind the terminal key to the exact query that produced this feature,
+      // even while a newer viewport request is in flight.
+      (map.getSource('thoughts') as GeoJSONSource).setData({
+        ...data,
+        features: data.features.map((feature) => ({
+          ...feature,
+          properties: {
+            ...feature.properties,
+            ...(feature.properties.group
+              ? {
+                  groupQuery: `${params}&group=${encodeURIComponent(feature.properties.group)}`,
+                }
+              : {}),
+          },
+        })),
+      });
       options.onStatus('ready');
     } catch {
       if (active() && !requestSignal.aborted) options.onStatus('error');

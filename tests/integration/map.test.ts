@@ -284,3 +284,87 @@ it('bounds repeated anonymous preview requests in the shared database', async ()
     'Too many attempts',
   );
 });
+
+it('discovers every terminal colocated member with bounded pages and current visibility', async () => {
+  const { coarsenPhilippinesPoint } =
+    await import('../../src/server/geo/privacy');
+  const safe = await coarsenPhilippinesPoint(fixture.pool, 14.5995, 120.9842);
+  await fixture.operator.query(`INSERT INTO "user"(id,name,email,email_verified)
+    SELECT md5('terminal-user-'||i)::uuid,'Private owner','terminal-'||i||'@test.invalid',true FROM generate_series(1,10) i`);
+  await fixture.operator.query(
+    `INSERT INTO thoughts(public_id,author_id,body,emotion,public_point,
+    privacy_cell,privacy_tier,privacy_algorithm_version,location_label,status,created_at)
+    SELECT 't_'||md5('terminal-'||i),md5('terminal-user-'||ceil(i/5.0)::int)::uuid,
+    'PRIVATE_BODY_CANARY',CASE WHEN i%2=1 THEN 'gratitude'::emotion ELSE 'confession'::emotion END,
+    ST_SetSRID(ST_MakePoint($1,$2),4326),$3,$4,1,$5,
+    CASE WHEN i=46 THEN 'hidden'::thought_status ELSE 'published'::thought_status END,
+    CASE WHEN i=47 THEN now()-interval '31 days' ELSE now() END
+    FROM generate_series(1,47) i`,
+    [safe.lng, safe.lat, safe.privacyCell, safe.privacyTier, safe.label],
+  );
+  const queries = await import('../../src/server/geo/pins');
+  const params = new URLSearchParams({
+    bbox: `${safe.lng - 0.0001},${safe.lat - 0.0001},${safe.lng + 0.0001},${safe.lat + 0.0001}`,
+    zoom: '18',
+  });
+  const pins = await queries.queryMapPins(fixture.pool, params);
+  const group = pins.features.find((f) => f.properties.count === 45)!;
+  expect(group?.properties.group).toMatch(/^\d+:\d+$/);
+  params.set('group', group.properties.group!);
+  const seen: string[] = [];
+  for (const size of [20, 20, 5]) {
+    const result = await queries.queryMapMembers(fixture.pool, params);
+    expect(result.total).toBe(45);
+    expect(result.members).toHaveLength(size);
+    expect(Buffer.byteLength(JSON.stringify(result))).toBeLessThan(6000);
+    expect(JSON.stringify(result)).not.toMatch(
+      /PRIVATE_BODY|author|pseudonym|reaction|email|privacyCell/,
+    );
+    for (const member of result.members) {
+      expect(Object.keys(member).sort()).toEqual([
+        'emotion',
+        'label',
+        'publicId',
+      ]);
+      expect(member.label).toBe('Metro Manila');
+      seen.push(member.publicId);
+    }
+    if (result.nextCursor) params.set('after', result.nextCursor);
+    else expect(size).toBe(5);
+  }
+  expect(new Set(seen).size).toBe(45);
+  params.delete('after');
+  params.set('emotion', 'gratitude');
+  const filtered = await queries.queryMapMembers(fixture.pool, params);
+  expect(filtered.total).toBe(23);
+  expect(filtered.members.every((m) => m.emotion === 'gratitude')).toBe(true);
+  const hiddenId = filtered.members[0].publicId;
+  await fixture.pool.query(
+    "UPDATE thoughts SET status='hidden' WHERE public_id=$1",
+    [hiddenId],
+  );
+  const current = await queries.queryMapMembers(fixture.pool, params);
+  expect(current.total).toBe(22);
+  expect(current.members.some((m) => m.publicId === hiddenId)).toBe(false);
+  const outside = new URLSearchParams(params);
+  outside.set('bbox', '0,0,1,1');
+  expect((await queries.queryMapMembers(fixture.pool, outside)).total).toBe(0);
+  for (const [key, value] of [
+    ['zoom', '17'],
+    ['group', '31:0'],
+    ['group', '-1:0'],
+    ['after', 'bad'],
+    ['limit', '10000'],
+  ]) {
+    const invalid = new URLSearchParams(params);
+    invalid.set(key, value);
+    await expect(
+      queries.queryMapMembers(fixture.pool, invalid),
+    ).rejects.toThrow();
+  }
+  const duplicate = new URLSearchParams(params);
+  duplicate.append('group', '0:0');
+  await expect(
+    queries.queryMapMembers(fixture.pool, duplicate),
+  ).rejects.toThrow();
+}, 60000);

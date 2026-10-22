@@ -94,6 +94,14 @@ test('map routes reject invalid unbounded queries and preview cross-origin bodie
     '?bbox=-180,-85,180,85&zoom=1&emotion=invalid',
   ])
     expect((await request.get(`/api/map/pins${query}`)).status()).toBe(400);
+  for (const query of [
+    '?bbox=-180,-85,180,85&zoom=18',
+    '?bbox=-180,-85,180,85&zoom=17&group=0:0',
+    '?bbox=-180,-85,180,85&zoom=18&group=0:0&limit=10000',
+    '?bbox=-180,-85,180,85&zoom=18&group=0:0&after=invalid',
+    '?bbox=-180,-85,180,85&zoom=18&group=0:0&group=1:1',
+  ])
+    expect((await request.get(`/api/map/members${query}`)).status()).toBe(400);
   const response = await request.post('/api/map/preview', {
     headers: { origin: 'https://foreign.invalid' },
     data: { lat: 14.6, lng: 120.98 },

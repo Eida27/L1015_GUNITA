@@ -858,6 +858,16 @@ button {
   padding: 0;
   list-style: none;
 }
+.map-group-members {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  list-style: none;
+}
+.map-group-members button {
+  width: 100%;
+  text-align: left;
+}
 .map-experience :focus-visible {
   outline: 3px solid var(--accent);
   outline-offset: 3px;

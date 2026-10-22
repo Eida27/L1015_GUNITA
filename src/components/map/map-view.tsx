@@ -10,6 +10,7 @@ import {
   type MapCamera,
 } from './map-engine';
 import type { MessageKey } from '@/lib/i18n/catalog';
+import { MapGroup } from './map-group';
 
 const emotionKeys: Record<string, MessageKey> = {
   love: 'Love',
@@ -37,6 +38,7 @@ export default function MapView({ signal }: { signal: AbortSignal }) {
   );
   const [markers, setMarkers] = useState<DisplayMarker[]>([]);
   const [selected, setSelected] = useState<DisplayMarker | null>(null);
+  const [groupQuery, setGroupQuery] = useState<string | null>(null);
   const [preview, setPreview] = useState<CoarsePreview | null>(null);
   const [pickStatus, setPickStatus] = useState<
     'idle' | 'loading' | 'invalid' | 'error'
@@ -100,6 +102,7 @@ export default function MapView({ signal }: { signal: AbortSignal }) {
       onMarkers: setMarkers,
       onStatus: setStatus,
       onSelect: setSelected,
+      onGroup: setGroupQuery,
       onPick: (lat, lng) => void pickRef.current(lat, lng),
     })
       .then((value) => {
@@ -289,7 +292,7 @@ export default function MapView({ signal }: { signal: AbortSignal }) {
                   data-count={item.count}
                 >
                   {item.count > 1
-                    ? `${item.count} ${t('thoughts — zoom in')}`
+                    ? `${item.count} ${t(item.groupQuery ? 'thoughts — choose one' : 'thoughts — zoom in')}`
                     : `${t(emotionKeys[item.emotion ?? 'other'] ?? 'Other')} · ${item.label}`}
                 </button>
               </li>
@@ -312,6 +315,13 @@ export default function MapView({ signal }: { signal: AbortSignal }) {
           </div>
         ) : null}
       </details>
+      {groupQuery ? (
+        <MapGroup
+          query={groupQuery}
+          signal={signal}
+          onClose={() => setGroupQuery(null)}
+        />
+      ) : null}
       {selected ? (
         <Dialog titleId="selected-place" onClose={() => setSelected(null)}>
           <h2 id="selected-place">
