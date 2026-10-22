@@ -4,6 +4,7 @@ const config: NextConfig = {
   output: 'standalone',
   experimental: { cpus: 1 },
   poweredByHeader: false,
+  logging: false,
   async headers() {
     return [
       {

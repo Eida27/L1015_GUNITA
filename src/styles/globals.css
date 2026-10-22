@@ -738,3 +738,155 @@ button {
 .preference-controls select {
   border-color: var(--accent);
 }
+
+/* The primary map stays generous on phones without overflowing its shell. */
+.map-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 28px 0 20px;
+}
+.map-heading h1 {
+  font:
+    normal clamp(1.5rem, 3vw, 2.5rem)/1.15 Georgia,
+    serif;
+  margin: 0;
+  max-width: 560px;
+}
+.map-heading .eyebrow {
+  margin: 0 0 10px;
+}
+.map-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  margin: 12px 0;
+}
+.map-toolbar label,
+.coordinate-form label {
+  display: grid;
+  gap: 6px;
+}
+.map-experience button,
+.map-experience select,
+.map-experience input {
+  font: inherit;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 14px;
+  background: var(--paper);
+  color: var(--ink);
+  max-width: 100%;
+}
+.map-experience button {
+  cursor: pointer;
+}
+.map-experience button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.map-experience button[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--canvas);
+}
+.map-canvas {
+  width: 100%;
+  height: min(64vh, 640px);
+  min-height: 360px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  overflow: hidden;
+}
+.map-canvas .maplibregl-ctrl button {
+  padding: 0;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  background: white;
+}
+.map-canvas .maplibregl-ctrl-attrib {
+  color: #343d35;
+}
+.map-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  min-height: 52px;
+  color: var(--muted);
+}
+.map-picker,
+.visible-markers {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 12px 0;
+}
+.map-picker h2 {
+  margin-top: 0;
+  font:
+    normal 1.5rem Georgia,
+    serif;
+}
+.map-picker p,
+.visible-markers p {
+  line-height: 1.6;
+}
+.map-experience summary {
+  cursor: pointer;
+  min-height: 44px;
+  padding: 12px 0;
+}
+.coordinate-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: end;
+}
+.coordinate-form input {
+  width: 180px;
+}
+.visible-markers ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0;
+  list-style: none;
+}
+.map-experience :focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+@media (max-width: 600px) {
+  .map-heading {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .map-canvas {
+    min-height: 340px;
+    height: 55vh;
+  }
+  .map-shell .site-header {
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 14px 0;
+  }
+  .map-shell .site-header .account-links {
+    margin: 0;
+  }
+  .map-picker,
+  .visible-markers {
+    padding: 14px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .map-experience * {
+    scroll-behavior: auto;
+  }
+}

@@ -15,21 +15,17 @@ test('database readiness crosses the host application boundary', async ({
   expect(response.headers()['cache-control']).toBe('no-store');
 });
 
-test('foundation is labeled honestly and exposes a working health link', async ({
+test('acknowledged entry makes the interactive map the primary content', async ({
   page,
 }) => {
   await enter(page);
   await expect(page.getByRole('heading', { level: 1 })).toContainText(
     'feelings left unsaid',
   );
+  await expect(page.getByTestId('map-view')).toBeVisible();
   await expect(
-    page.getByText('Local foundation', { exact: true }),
+    page.getByRole('button', { name: 'Explore thoughts in the Philippines' }),
   ).toBeVisible();
-  await expect(
-    page.getByText('Accounts are ready. Map and publishing are still to come.'),
-  ).toBeVisible();
-  await page.getByRole('link', { name: 'Check app health' }).click();
-  await expect(page.locator('body')).toContainText('"status":"ok"');
 });
 
 test('fits a narrow viewport with semantic landmarks and keyboard navigation', async ({

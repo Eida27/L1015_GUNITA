@@ -1,0 +1,40 @@
+{
+  "version": 8,
+  "name": "Gunita local development world fixture",
+  "sources": {
+    "world": {
+      "type": "geojson",
+      "data": "/maps/development-world.geojson",
+      "attribution": "Natural Earth · public domain · local development fixture"
+    }
+  },
+  "layers": [
+    {
+      "id": "water",
+      "type": "background",
+      "paint": { "background-color": "#dfe7df" }
+    },
+    {
+      "id": "land",
+      "type": "fill",
+      "source": "world",
+      "paint": { "fill-color": "#eeeadd", "fill-outline-color": "#aab5a0" }
+    },
+    {
+      "id": "country-label",
+      "type": "symbol",
+      "source": "world",
+      "minzoom": 1,
+      "layout": {
+        "text-field": ["get", "NAME"],
+        "text-font": ["Arial"],
+        "text-size": 11
+      },
+      "paint": {
+        "text-color": "#53604f",
+        "text-halo-color": "#eeeadd",
+        "text-halo-width": 1
+      }
+    }
+  ]
+}

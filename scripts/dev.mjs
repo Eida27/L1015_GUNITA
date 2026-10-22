@@ -2,10 +2,19 @@ import { spawn } from 'node:child_process';
 import { resolve } from 'node:path';
 import { loadLocalEnv } from './load-env.mjs';
 import { validateEnv } from './env.mjs';
+import { prepareMapAssets } from './prepare-map-assets.mjs';
 
 try {
   loadLocalEnv();
   const config = validateEnv(process.env, 'development');
+  await prepareMapAssets();
+  const childEnv = {
+    ...process.env,
+    NODE_ENV: 'development',
+    NEXT_TELEMETRY_DISABLED: '1',
+    FORCE_COLOR: '0',
+  };
+  delete childEnv.NO_COLOR;
   const child = spawn(
     process.execPath,
     [
@@ -18,11 +27,7 @@ try {
     ],
     {
       stdio: 'inherit',
-      env: {
-        ...process.env,
-        NODE_ENV: 'development',
-        NEXT_TELEMETRY_DISABLED: '1',
-      },
+      env: childEnv,
     },
   );
   child.on('exit', (code) => {

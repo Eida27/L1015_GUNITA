@@ -5,7 +5,7 @@ import { PreferencesProvider, Text } from '@/components/ui/preferences';
 export const metadata: Metadata = {
   title: 'Gunita — A place for feelings left unsaid',
   description:
-    'Gunita local development. Private accounts with permanent pseudonyms. Map and publishing are still to come.',
+    'A quiet Philippines-first map for feelings left unsaid. Broad places, room to feel.',
   robots: { index: false, follow: false },
 };
 
