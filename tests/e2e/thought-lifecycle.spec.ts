@@ -154,11 +154,26 @@ test('verified author publishes, guest reads plain text, author edits immutable 
   await expect(
     page.getByRole('textbox', { name: 'Your thought', exact: true }),
   ).toBeFocused();
+  await page
+    .getByRole('textbox', { name: 'Your thought', exact: true })
+    .fill('Discarded fictional draft.');
+  await page
+    .getByRole('dialog')
+    .getByRole('combobox', { name: 'Emotion', exact: true })
+    .selectOption('regret');
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
   await expect(
     page.getByRole('button', { name: 'Edit thought', exact: true }),
   ).toBeFocused();
   await page.getByRole('button', { name: 'Edit thought', exact: true }).click();
+  await expect(
+    page.getByRole('textbox', { name: 'Your thought', exact: true }),
+  ).toHaveValue(literal);
+  await expect(
+    page
+      .getByRole('dialog')
+      .getByRole('combobox', { name: 'Emotion', exact: true }),
+  ).toHaveValue(created.emotion);
   await expect(
     page.getByRole('textbox', { name: 'Your thought', exact: true }),
   ).toBeFocused();
@@ -211,4 +226,69 @@ test('verified author publishes, guest reads plain text, author edits immutable 
     'This thought is unavailable.',
   );
   await guest.close();
+});
+
+test('a rejected optional viewer request preserves public reading and still obeys live acknowledgment', async ({
+  page,
+}) => {
+  await page.route(`**/api/thoughts/${identity.publicId}/viewer`, (route) =>
+    route.abort('failed'),
+  );
+  await page.goto(identity.thoughtUrl);
+  await page.getByRole('checkbox').check();
+  const failed = page.waitForEvent('requestfailed', (request) =>
+    request.url().endsWith(`/${identity.publicId}/viewer`),
+  );
+  await page.getByRole('button', { name: 'Enter Gunita' }).click();
+  await failed;
+  await expect(page.locator('.thought-body')).toHaveText(
+    'Clearly fictional: a little hope for the morning.',
+  );
+  await expect(
+    page.getByRole('button', { name: 'Edit thought', exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole('button', { name: 'Delete thought', exact: true }),
+  ).toHaveCount(0);
+  await page.evaluate(() => localStorage.clear());
+  await expect(page.locator('.thought-body')).toHaveCount(0);
+  await page.unrouteAll({ behavior: 'wait' });
+});
+
+test('a failed viewer refresh clears previously granted author controls', async ({
+  page,
+}) => {
+  await page.goto(`${origin}/log-in`);
+  await page.getByLabel('Email address', { exact: true }).fill(identity.email);
+  await page.getByLabel('Password', { exact: true }).fill(identity.password);
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(page).toHaveURL(`${origin}/settings`);
+  await page.goto(identity.thoughtUrl);
+  await page.getByRole('checkbox').check();
+  await page.getByRole('button', { name: 'Enter Gunita' }).click();
+  await expect(
+    page.getByRole('button', { name: 'Edit thought', exact: true }),
+  ).toBeVisible();
+  await page.route(`**/api/thoughts/${identity.publicId}/viewer`, (route) =>
+    route.abort('failed'),
+  );
+  await page.getByRole('button', { name: 'Edit thought', exact: true }).click();
+  await page
+    .getByRole('textbox', { name: 'Your thought', exact: true })
+    .fill('Fictional public content after ownership lookup failure.');
+  const failed = page.waitForEvent('requestfailed', (request) =>
+    request.url().endsWith(`/${identity.publicId}/viewer`),
+  );
+  await page.getByRole('button', { name: 'Save changes', exact: true }).click();
+  await failed;
+  await expect(page.locator('.thought-body')).toHaveText(
+    'Fictional public content after ownership lookup failure.',
+  );
+  await expect(
+    page.getByRole('button', { name: 'Edit thought', exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole('button', { name: 'Delete thought', exact: true }),
+  ).toHaveCount(0);
+  await page.unrouteAll({ behavior: 'wait' });
 });

@@ -47,17 +47,18 @@ export function ThoughtDetail({
     if (editing) {
       restoreEditFocus.current = true;
       editor.current?.focus();
-    } else if (restoreEditFocus.current && status === 'ready') {
+    } else if (restoreEditFocus.current && status === 'ready' && canManage) {
       editButton.current?.focus();
       restoreEditFocus.current = false;
     }
-  }, [editing, status]);
+  }, [editing, status, canManage]);
   useEffect(() => {
     const controller = new AbortController();
     const combined = AbortSignal.any([signal, controller.signal]);
     const active = () => !combined.aborted && store.isAcknowledged();
     async function load() {
       if (!active()) return;
+      setCanManage(false);
       try {
         const response = await fetch(`/api/thoughts/${publicId}`, {
           signal: combined,
@@ -70,13 +71,19 @@ export function ThoughtDetail({
         setBody(data.body);
         setEmotion(data.emotion);
         setStatus('ready');
-        const viewer = await fetch(`/api/thoughts/${publicId}/viewer`, {
-          signal: combined,
-          cache: 'no-store',
-        });
-        if (viewer.ok) {
-          const state = await viewer.json();
-          if (active()) setCanManage(state.canManage === true);
+        try {
+          const viewer = await fetch(`/api/thoughts/${publicId}/viewer`, {
+            signal: combined,
+            cache: 'no-store',
+          });
+          if (viewer.ok) {
+            const state = await viewer.json();
+            if (active()) setCanManage(state.canManage === true);
+          }
+        } catch {
+          // Ownership is optional for public reading. A failed lookup never
+          // grants management or replaces already loaded public content.
+          if (active()) setCanManage(false);
         }
       } catch {
         if (active()) setStatus('unavailable');
@@ -85,6 +92,12 @@ export function ThoughtDetail({
     void load();
     return () => controller.abort();
   }, [publicId, signal, store, attempt]);
+  function resetDraft() {
+    if (!thought) return;
+    setBody(thought.body);
+    setEmotion(thought.emotion);
+    setError(null);
+  }
   async function mutate(method: 'PATCH' | 'DELETE') {
     if (signal.aborted || !store.isAcknowledged()) return;
     setBusy(true);
@@ -190,12 +203,24 @@ export function ThoughtDetail({
               >
                 {t('Save changes')}
               </button>
-              <button type="button" onClick={() => setEditing(false)}>
+              <button
+                type="button"
+                onClick={() => {
+                  resetDraft();
+                  setEditing(false);
+                }}
+              >
                 {t('Cancel')}
               </button>
             </form>
           ) : (
-            <button ref={editButton} onClick={() => setEditing(true)}>
+            <button
+              ref={editButton}
+              onClick={() => {
+                resetDraft();
+                setEditing(true);
+              }}
+            >
               {t('Edit thought')}
             </button>
           )}

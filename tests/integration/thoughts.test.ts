@@ -3,6 +3,12 @@ import { randomBytes } from 'node:crypto';
 import pg from 'pg';
 import { createMapDatabase } from '../fixtures/map-database';
 import { createAuthService } from '../../src/server/auth/service';
+import {
+  publicThoughtSchema,
+  consentResponseSchema,
+  viewerResponseSchema,
+  mutationReceiptSchema,
+} from '../../src/lib/thought-contract';
 vi.mock('server-only', () => ({}));
 
 let fixture: Awaited<ReturnType<typeof createMapDatabase>>;
@@ -89,16 +95,37 @@ it('requires current consent and verified auth, then publishes only a safe coars
       )
     ).status,
   ).toBe(422);
-  expect(
-    (
-      await service.handle(
-        request('/api/me/consent', 'PUT', { version: 'guidelines-2026-10-19' }),
-      )
-    ).status,
-  ).toBe(200);
+  await fixture.operator.query(
+    'INSERT INTO user_consents(user_id,guidelines_version) VALUES($1,$2)',
+    [authorId, 'old-guidelines'],
+  );
+  const olderConsent = await service.handle(request('/api/me/consent'));
+  expect(olderConsent.status).toBe(200);
+  expect(consentResponseSchema.parse(await olderConsent.json())).toEqual({
+    version: 'guidelines-2026-10-19',
+    accepted: false,
+  });
+  const consent = await service.handle(
+    request('/api/me/consent', 'PUT', { version: 'guidelines-2026-10-19' }),
+  );
+  expect(consent.status).toBe(200);
+  expect(consentResponseSchema.parse(await consent.json())).toEqual({
+    version: 'guidelines-2026-10-19',
+    accepted: true,
+  });
+  const consentRead = await service.handle(request('/api/me/consent'));
+  expect(consentResponseSchema.parse(await consentRead.json()).accepted).toBe(
+    true,
+  );
   const out = await service.handle(request('/api/thoughts', 'POST', input()));
   expect(out.status).toBe(201);
-  const dto = await out.json();
+  const dto = publicThoughtSchema.parse(await out.json());
+  const viewer = await service.handle(
+    request(`/api/thoughts/${dto.publicId}/viewer`),
+  );
+  expect(viewerResponseSchema.parse(await viewer.json())).toEqual({
+    canManage: true,
+  });
   expect(dto).toMatchObject({
     body: 'A fictional quiet hope.',
     emotion: 'hope',
@@ -220,16 +247,16 @@ it('edits keep lifetime and location, owner checks deny outsiders, deletion cann
   expect(created.status).toBe(201);
   const dto = await created.json();
   const path = `/api/thoughts/${dto.publicId}`;
-  expect(
-    (
-      await service.handle(
-        request(path, 'PATCH', {
-          body: 'Edited fictional hope.',
-          emotion: 'gratitude',
-        }),
-      )
-    ).status,
-  ).toBe(200);
+  const patch = await service.handle(
+    request(path, 'PATCH', {
+      body: 'Edited fictional hope.',
+      emotion: 'gratitude',
+    }),
+  );
+  expect(patch.status).toBe(200);
+  expect(mutationReceiptSchema.parse(await patch.json())).toEqual({
+    status: true,
+  });
   const edited = await (await service.handle(request(path))).json();
   expect(edited.createdAt).toBe(dto.createdAt);
   expect(edited.expiresAt).toBe(dto.expiresAt);
@@ -263,7 +290,11 @@ it('edits keep lifetime and location, owner checks deny outsiders, deletion cann
   expect(
     (await service.handle(request(path, 'DELETE', undefined, outsider))).status,
   ).toBe(404);
-  expect((await service.handle(request(path, 'DELETE'))).status).toBe(200);
+  const deleted = await service.handle(request(path, 'DELETE'));
+  expect(deleted.status).toBe(200);
+  expect(mutationReceiptSchema.parse(await deleted.json())).toEqual({
+    status: true,
+  });
   expect((await service.handle(request(path))).status).toBe(404);
   expect(
     (

@@ -5,7 +5,13 @@ import { z } from 'zod';
 import { ApiError, errorResponse } from '@/lib/api/errors';
 import { parseJsonBody } from '@/lib/validation/json';
 import { emotions } from '@/lib/map-contract';
-import { CURRENT_GUIDELINES_VERSION } from '@/lib/thought-contract';
+import {
+  CURRENT_GUIDELINES_VERSION,
+  publicThoughtSchema,
+  consentResponseSchema,
+  viewerResponseSchema,
+  mutationReceiptSchema,
+} from '@/lib/thought-contract';
 import type { createAuthService } from '@/server/auth/service';
 import { requireVerifiedMember } from '@/server/auth/guards';
 import { coarsenPhilippinesPoint, LocationError } from '@/server/geo/privacy';
@@ -25,8 +31,23 @@ const edit = z
   .object({ body: text.optional(), emotion: z.enum(emotions).optional() })
   .strict()
   .refine((v) => v.body !== undefined || v.emotion !== undefined);
-function json(value: unknown, privateData = false, status = 200) {
-  return Response.json(value, {
+const unavailableSchema = z
+  .object({ code: z.literal('THOUGHT_UNAVAILABLE') })
+  .strict();
+const locationErrorSchema = z
+  .object({ code: z.enum(['INVALID_LOCATION', 'OUTSIDE_PHILIPPINES']) })
+  .strict();
+function json(
+  schema: z.ZodType,
+  value: unknown,
+  privateData = false,
+  status = 200,
+) {
+  const output = schema.safeParse(value);
+  // Producer drift is a server failure, never a client-input Zod error. Do not
+  // expose schema diagnostics, database values or unknown response properties.
+  if (!output.success) throw new ApiError('INTERNAL_ERROR');
+  return Response.json(output.data, {
     status,
     headers: { 'Cache-Control': `${privateData ? 'private, ' : ''}no-store` },
   });
@@ -40,8 +61,14 @@ async function detail(db: Pick<Pool, 'query'>, id: string) {
     emotion: row.emotion,
     pseudonym: row.pseudonym,
     location: { label: row.locationLabel, lat: row.lat, lng: row.lng },
-    createdAt: row.createdAt,
-    expiresAt: row.expiresAt,
+    createdAt:
+      row.createdAt instanceof Date
+        ? row.createdAt.toISOString()
+        : row.createdAt,
+    expiresAt:
+      row.expiresAt instanceof Date
+        ? row.expiresAt.toISOString()
+        : row.expiresAt,
   };
 }
 export function createThoughtService({
@@ -64,7 +91,7 @@ export function createThoughtService({
       );
       const id = match ? publicId.parse(match[1]) : null;
       if (request.method === 'GET' && id && !match?.[2])
-        return json(await detail(pool, id));
+        return json(publicThoughtSchema, await detail(pool, id));
       if (request.method !== 'GET' && request.headers.get('origin') !== origin)
         throw new ApiError('FORBIDDEN');
       const consent = url.pathname === '/api/me/consent';
@@ -77,7 +104,12 @@ export function createThoughtService({
         !viewing &&
         !(id && !match?.[2] && ['PATCH', 'DELETE'].includes(request.method))
       )
-        return json({ code: 'THOUGHT_UNAVAILABLE' }, false, 404);
+        return json(
+          unavailableSchema,
+          { code: 'THOUGHT_UNAVAILABLE' },
+          false,
+          404,
+        );
       const input = creating
         ? await parseJsonBody(request, create, 16384)
         : request.method === 'PATCH'
@@ -110,7 +142,11 @@ export function createThoughtService({
                 [actor.userId, CURRENT_GUIDELINES_VERSION],
               )
             ).rowCount! > 0;
-          return json({ version: CURRENT_GUIDELINES_VERSION, accepted }, true);
+          return json(
+            consentResponseSchema,
+            { version: CURRENT_GUIDELINES_VERSION, accepted },
+            true,
+          );
         }
         if (creating) {
           if (
@@ -155,7 +191,12 @@ export function createThoughtService({
               point.label,
             ],
           );
-          return json(await detail(db, generated), false, 201);
+          return json(
+            publicThoughtSchema,
+            await detail(db, generated),
+            false,
+            201,
+          );
         }
         const row = (
           await db.query(
@@ -165,6 +206,7 @@ export function createThoughtService({
         ).rows[0];
         if (viewing)
           return json(
+            viewerResponseSchema,
             { canManage: !!row && row.author_id === actor.userId },
             true,
           );
@@ -175,7 +217,7 @@ export function createThoughtService({
             'DELETE FROM thoughts WHERE public_id=$1 AND author_id=$2',
             [id, actor.userId],
           );
-          return json({ status: true }, true);
+          return json(mutationReceiptSchema, { status: true }, true);
         }
         const bucket = createHmac('sha256', secret)
           .update(`edits:${actor.userId}`)
@@ -199,11 +241,11 @@ export function createThoughtService({
             actor.userId,
           ],
         );
-        return json({ status: true }, true);
+        return json(mutationReceiptSchema, { status: true }, true);
       });
     } catch (error) {
       if (error instanceof LocationError)
-        return json({ code: error.code }, false, 422);
+        return json(locationErrorSchema, { code: error.code }, false, 422);
       if (error instanceof z.ZodError)
         return errorResponse(new ApiError('INVALID_INPUT'));
       if (
