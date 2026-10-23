@@ -17,6 +17,12 @@ import { requireVerifiedMember } from '@/server/auth/guards';
 import { coarsenPhilippinesPoint, LocationError } from '@/server/geo/privacy';
 import { findPublishedThought } from '@/server/db/published.mjs';
 import { validateThoughtBody } from './content';
+import {
+  handleInteraction,
+  interactionPath,
+  viewerState,
+  thoughtDto,
+} from './interactions';
 
 const publicId = z.string().regex(/^t_[A-Za-z0-9_-]{22,64}$/);
 const text = z.string().max(8192);
@@ -55,21 +61,7 @@ function json(
 async function detail(db: Pick<Pool, 'query'>, id: string) {
   const row = await findPublishedThought(db, id);
   if (!row) throw new ApiError('THOUGHT_UNAVAILABLE');
-  return {
-    publicId: row.publicId,
-    body: row.body,
-    emotion: row.emotion,
-    pseudonym: row.pseudonym,
-    location: { label: row.locationLabel, lat: row.lat, lng: row.lng },
-    createdAt:
-      row.createdAt instanceof Date
-        ? row.createdAt.toISOString()
-        : row.createdAt,
-    expiresAt:
-      row.expiresAt instanceof Date
-        ? row.expiresAt.toISOString()
-        : row.expiresAt,
-  };
+  return thoughtDto(row);
 }
 export function createThoughtService({
   auth,
@@ -85,6 +77,8 @@ export function createThoughtService({
   async function handle(request: Request) {
     try {
       const url = new URL(request.url);
+      if (interactionPath(url.pathname))
+        return handleInteraction(request, { auth, origin, secret });
       if (url.search) throw new ApiError('INVALID_INPUT');
       const match = url.pathname.match(
         /^\/api\/thoughts\/(t_[A-Za-z0-9_-]+)(\/viewer)?$/,
@@ -198,18 +192,18 @@ export function createThoughtService({
             201,
           );
         }
+        if (viewing)
+          return json(
+            viewerResponseSchema,
+            await viewerState(db, id!, actor),
+            true,
+          );
         const row = (
           await db.query(
             'SELECT author_id FROM thoughts WHERE public_id=$1 AND expires_at>statement_timestamp() FOR UPDATE',
             [id],
           )
         ).rows[0];
-        if (viewing)
-          return json(
-            viewerResponseSchema,
-            { canManage: !!row && row.author_id === actor.userId },
-            true,
-          );
         if (!row || row.author_id !== actor.userId)
           throw new ApiError('THOUGHT_UNAVAILABLE');
         if (request.method === 'DELETE') {
@@ -246,8 +240,7 @@ export function createThoughtService({
     } catch (error) {
       if (error instanceof LocationError)
         return json(locationErrorSchema, { code: error.code }, false, 422);
-      if (error instanceof z.ZodError)
-        return errorResponse(new ApiError('INVALID_INPUT'));
+      if (error instanceof z.ZodError) error = new ApiError('INVALID_INPUT');
       if (
         error &&
         typeof error === 'object' &&
@@ -257,7 +250,10 @@ export function createThoughtService({
         error.message === 'Rolling publication quota reached'
       )
         return errorResponse(new ApiError('POST_LIMIT_REACHED'));
-      return errorResponse(error);
+      const response = errorResponse(error);
+      if (new URL(request.url).pathname.endsWith('/viewer'))
+        response.headers.set('Cache-Control', 'private, no-store');
+      return response;
     }
   }
   return { handle };

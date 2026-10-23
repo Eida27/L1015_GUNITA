@@ -1,6 +1,19 @@
 import { z } from 'zod';
 import { emotions } from './map-contract';
 export const CURRENT_GUIDELINES_VERSION = 'guidelines-2026-10-19';
+export const reactionTypes = ['love', 'sad', 'care', 'happy'] as const;
+export const reactionInputSchema = z
+  .object({ type: z.enum(reactionTypes) })
+  .strict();
+export const emptyInteractionInputSchema = z.object({}).strict();
+export const dashboardQuerySchema = z
+  .object({
+    cursor: z
+      .string()
+      .regex(/^t_[A-Za-z0-9_-]{22,64}$/)
+      .optional(),
+  })
+  .strict();
 export function relativeThoughtTime(
   value: string,
   locale: 'en' | 'fil',
@@ -47,6 +60,12 @@ export const publicThoughtSchema = z
       .strict(),
     createdAt: z.iso.datetime(),
     expiresAt: z.iso.datetime(),
+    reactionTypes: z.tuple([
+      z.literal('love'),
+      z.literal('sad'),
+      z.literal('care'),
+      z.literal('happy'),
+    ]),
   })
   .strict()
   .refine(
@@ -61,7 +80,47 @@ export const consentResponseSchema = z
   })
   .strict();
 export const viewerResponseSchema = z
-  .object({ canManage: z.boolean() })
+  .object({
+    canManage: z.boolean(),
+    myReaction: z.enum(reactionTypes).nullable(),
+    bookmarked: z.boolean(),
+  })
+  .strict();
+export const reactionTotalsSchema = z
+  .object({
+    love: z.number().int().nonnegative(),
+    sad: z.number().int().nonnegative(),
+    care: z.number().int().nonnegative(),
+    happy: z.number().int().nonnegative(),
+  })
+  .strict();
+export const totalsResponseSchema = z
+  .object({ totals: reactionTotalsSchema })
+  .strict();
+export const ownThoughtSchema = z
+  .object({
+    thought: publicThoughtSchema,
+    status: z.literal('published'),
+    totals: reactionTotalsSchema,
+  })
+  .strict();
+export const ownThoughtsResponseSchema = z
+  .object({
+    items: z.array(ownThoughtSchema).max(20),
+    nextCursor: z
+      .string()
+      .regex(/^t_[A-Za-z0-9_-]{22,64}$/)
+      .nullable(),
+  })
+  .strict();
+export const bookmarksResponseSchema = z
+  .object({
+    items: z.array(publicThoughtSchema).max(20),
+    nextCursor: z
+      .string()
+      .regex(/^t_[A-Za-z0-9_-]{22,64}$/)
+      .nullable(),
+  })
   .strict();
 export const mutationReceiptSchema = z
   .object({ status: z.literal(true) })
@@ -70,3 +129,6 @@ export type PublicThought = z.infer<typeof publicThoughtSchema>;
 export type ConsentResponse = z.infer<typeof consentResponseSchema>;
 export type ViewerResponse = z.infer<typeof viewerResponseSchema>;
 export type MutationReceipt = z.infer<typeof mutationReceiptSchema>;
+export type OwnThought = z.infer<typeof ownThoughtSchema>;
+export type OwnThoughtsResponse = z.infer<typeof ownThoughtsResponseSchema>;
+export type BookmarksResponse = z.infer<typeof bookmarksResponseSchema>;

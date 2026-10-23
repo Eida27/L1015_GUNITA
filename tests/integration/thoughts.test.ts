@@ -125,6 +125,8 @@ it('requires current consent and verified auth, then publishes only a safe coars
   );
   expect(viewerResponseSchema.parse(await viewer.json())).toEqual({
     canManage: true,
+    myReaction: null,
+    bookmarked: false,
   });
   expect(dto).toMatchObject({
     body: 'A fictional quiet hope.',

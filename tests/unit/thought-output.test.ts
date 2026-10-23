@@ -16,6 +16,7 @@ const valid = {
   location: { label: 'Metro Manila', lat: 14.6, lng: 120.98 },
   createdAt: '2026-10-22T00:00:00.000Z',
   expiresAt: '2026-11-21T00:00:00.000Z',
+  reactionTypes: ['love', 'sad', 'care', 'happy'],
 };
 it('defines strict shared schemas for each existing response shape', async () => {
   const schemas = contracts as unknown as Record<string, z.ZodType>;
@@ -25,7 +26,10 @@ it('defines strict shared schemas for each existing response shape', async () =>
       'consentResponseSchema',
       { version: 'guidelines-2026-10-19', accepted: true },
     ],
-    ['viewerResponseSchema', { canManage: false }],
+    [
+      'viewerResponseSchema',
+      { canManage: false, myReaction: null, bookmarked: false },
+    ],
     ['mutationReceiptSchema', { status: true }],
   ] as const) {
     expect(schemas[key], key).toBeDefined();
@@ -47,7 +51,11 @@ it('defines strict shared schemas for each existing response shape', async () =>
     }).success,
   ).toBe(false);
   expect(
-    schemas.viewerResponseSchema.safeParse({ canManage: 'true' }).success,
+    schemas.viewerResponseSchema.safeParse({
+      canManage: 'true',
+      myReaction: null,
+      bookmarked: false,
+    }).success,
   ).toBe(false);
   expect(
     schemas.consentResponseSchema.safeParse({ version: 'old', accepted: true })

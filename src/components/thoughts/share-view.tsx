@@ -27,6 +27,9 @@ export function ShareView({ publicId }: { publicId: string }) {
           gunita
         </Link>
         <PreferenceControls />
+        <Link href="/dashboard/thoughts" prefetch={false}>
+          {t('Your active thoughts')}
+        </Link>
       </header>
       <main tabIndex={-1} id="main">
         <h1>{t('A thought left unsaid')}</h1>

@@ -34,6 +34,14 @@ export function SettingsView({
         <p className="introduction">
           {t('A private place to manage your email, password and account.')}
         </p>
+        <nav className="account-links" aria-label={t('Your account')}>
+          <Link href="/dashboard/thoughts" prefetch={false}>
+            {t('Your active thoughts')}
+          </Link>
+          <Link href="/dashboard/bookmarks" prefetch={false}>
+            {t('Saved thoughts')}
+          </Link>
+        </nav>
       </section>
       <SettingsPanel email={account.email} pseudonym={account.pseudonym} />
     </div>

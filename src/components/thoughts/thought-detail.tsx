@@ -6,6 +6,10 @@ import { emotions } from '@/lib/map-contract';
 import {
   graphemeCount,
   relativeThoughtTime,
+  publicThoughtSchema,
+  viewerResponseSchema,
+  reactionTypes,
+  type ViewerResponse,
   type PublicThought,
 } from '@/lib/thought-contract';
 import { errorKey, type MessageKey } from '@/lib/i18n/catalog';
@@ -24,9 +28,13 @@ export const emotionLabels: Record<(typeof emotions)[number], MessageKey> = {
 export function ThoughtDetail({
   publicId,
   signal,
+  initialThought,
+  onChanged,
 }: {
   publicId: string;
   signal: AbortSignal;
+  initialThought?: PublicThought;
+  onChanged?: (action: 'PATCH' | 'DELETE' | 'bookmark') => void;
 }) {
   const { store, t, locale } = usePreferences();
   const [thought, setThought] = useState<PublicThought | null>(null);
@@ -34,6 +42,9 @@ export function ThoughtDetail({
     'loading',
   );
   const [canManage, setCanManage] = useState(false);
+  const [viewer, setViewer] = useState<ViewerResponse | null>(null);
+  const [checkingViewer, setCheckingViewer] = useState(true);
+  const [prompt, setPrompt] = useState(false);
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<MessageKey | null>(null);
@@ -43,6 +54,52 @@ export function ThoughtDetail({
   const editor = useRef<HTMLTextAreaElement>(null);
   const editButton = useRef<HTMLButtonElement>(null);
   const restoreEditFocus = useRef(false);
+  const privateEpoch = useRef(0);
+  useEffect(() => {
+    if (!thought) return;
+    const timer = window.setTimeout(
+      () => {
+        if (Date.parse(thought.expiresAt) > Date.now()) {
+          setAttempt((n) => n + 1);
+          return;
+        }
+        setThought(null);
+        setStatus('unavailable');
+        setCanManage(false);
+        setViewer(null);
+      },
+      Math.max(
+        0,
+        Math.min(2147483647, Date.parse(thought.expiresAt) - Date.now()),
+      ),
+    );
+    return () => window.clearTimeout(timer);
+  }, [thought]);
+  useEffect(() => {
+    function clear() {
+      privateEpoch.current++;
+      setCanManage(false);
+      setViewer(null);
+      setCheckingViewer(true);
+      setEditing(false);
+    }
+    function refresh() {
+      clear();
+      setAttempt((n) => n + 1);
+    }
+    function visibility() {
+      if (document.hidden) clear();
+      else refresh();
+    }
+    window.addEventListener('focus', refresh);
+    window.addEventListener('pageshow', refresh);
+    document.addEventListener('visibilitychange', visibility);
+    return () => {
+      window.removeEventListener('focus', refresh);
+      window.removeEventListener('pageshow', refresh);
+      document.removeEventListener('visibilitychange', visibility);
+    };
+  }, []);
   useEffect(() => {
     if (editing) {
       restoreEditFocus.current = true;
@@ -55,17 +112,30 @@ export function ThoughtDetail({
   useEffect(() => {
     const controller = new AbortController();
     const combined = AbortSignal.any([signal, controller.signal]);
-    const active = () => !combined.aborted && store.isAcknowledged();
+    const epoch = privateEpoch.current;
+    const active = () =>
+      !combined.aborted &&
+      store.isAcknowledged() &&
+      !document.hidden &&
+      epoch === privateEpoch.current;
     async function load() {
       if (!active()) return;
       setCanManage(false);
+      setViewer(null);
+      setCheckingViewer(true);
+      setPrompt(false);
       try {
-        const response = await fetch(`/api/thoughts/${publicId}`, {
-          signal: combined,
-          cache: 'no-store',
-        });
-        if (!response.ok) throw new Error('Unavailable');
-        const data: PublicThought = await response.json();
+        const response =
+          initialThought && attempt === 0
+            ? null
+            : await fetch(`/api/thoughts/${publicId}`, {
+                signal: combined,
+                cache: 'no-store',
+              });
+        if (response && !response.ok) throw new Error('Unavailable');
+        const data = publicThoughtSchema.parse(
+          response ? await response.json() : initialThought,
+        );
         if (!active()) return;
         setThought(data);
         setBody(data.body);
@@ -77,21 +147,87 @@ export function ThoughtDetail({
             cache: 'no-store',
           });
           if (viewer.ok) {
-            const state = await viewer.json();
-            if (active()) setCanManage(state.canManage === true);
+            const state = viewerResponseSchema.parse(await viewer.json());
+            if (active()) {
+              setCanManage(state.canManage);
+              setViewer(state);
+            }
           }
         } catch {
           // Ownership is optional for public reading. A failed lookup never
           // grants management or replaces already loaded public content.
           if (active()) setCanManage(false);
+        } finally {
+          if (active()) setCheckingViewer(false);
         }
       } catch {
-        if (active()) setStatus('unavailable');
+        if (active()) {
+          setStatus('unavailable');
+          setCheckingViewer(false);
+        }
       }
     }
     void load();
     return () => controller.abort();
-  }, [publicId, signal, store, attempt]);
+  }, [publicId, signal, store, attempt, initialThought]);
+  async function interact(
+    kind: 'reaction' | 'bookmark',
+    type?: (typeof reactionTypes)[number],
+  ) {
+    if (signal.aborted || !store.isAcknowledged()) return;
+    if (!viewer) {
+      setPrompt(true);
+      return;
+    }
+    const epoch = privateEpoch.current;
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/thoughts/${publicId}/${kind}`, {
+        method: kind === 'bookmark' && viewer.bookmarked ? 'DELETE' : 'PUT',
+        cache: 'no-store',
+        signal,
+        headers: { 'content-type': 'application/json' },
+        ...(type ? { body: JSON.stringify({ type }) } : {}),
+      });
+      if (
+        signal.aborted ||
+        !store.isAcknowledged() ||
+        epoch !== privateEpoch.current
+      )
+        return;
+      if (!response.ok) {
+        setError(errorKey((await response.json()).code));
+        setViewer(null);
+        setCanManage(false);
+        return;
+      }
+      const refreshed = await fetch(`/api/thoughts/${publicId}/viewer`, {
+        cache: 'no-store',
+        signal,
+      });
+      if (!refreshed.ok) throw new Error('Unavailable');
+      const state = viewerResponseSchema.parse(await refreshed.json());
+      if (
+        !signal.aborted &&
+        store.isAcknowledged() &&
+        !document.hidden &&
+        epoch === privateEpoch.current
+      ) {
+        setViewer(state);
+        setCanManage(state.canManage);
+        if (kind === 'bookmark') onChanged?.('bookmark');
+      }
+    } catch {
+      if (!signal.aborted && store.isAcknowledged()) {
+        setViewer(null);
+        setCanManage(false);
+        setError('Something went wrong. Please try again.');
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
   function resetDraft() {
     if (!thought) return;
     setBody(thought.body);
@@ -122,10 +258,12 @@ export function ThoughtDetail({
         setThought(null);
         setStatus('unavailable');
         setCanManage(false);
+        setViewer(null);
       } else {
         setStatus('loading');
         setAttempt((n) => n + 1);
       }
+      onChanged?.(method);
     } catch {
       if (!signal.aborted && store.isAcknowledged())
         setError('Something went wrong. Please try again.');
@@ -164,6 +302,51 @@ export function ThoughtDetail({
       <Link href={`/thought/${thought.publicId}`} prefetch={false}>
         {t('Share this thought')}
       </Link>
+      <div
+        className="interaction-controls"
+        role="group"
+        aria-label={t('Reactions')}
+        aria-busy={checkingViewer || busy}
+      >
+        {reactionTypes.map((type) => (
+          <button
+            key={type}
+            disabled={busy || canManage || checkingViewer}
+            aria-pressed={viewer?.myReaction === type}
+            onClick={() => void interact('reaction', type)}
+          >
+            {t(
+              (
+                {
+                  love: 'Reaction love',
+                  sad: 'Sad',
+                  care: 'Care',
+                  happy: 'Happy',
+                } as const
+              )[type],
+            )}
+          </button>
+        ))}
+        <button
+          disabled={busy || canManage || checkingViewer}
+          aria-pressed={viewer?.bookmarked ?? false}
+          onClick={() => void interact('bookmark')}
+        >
+          {t(viewer?.bookmarked ? 'Remove bookmark' : 'Save thought')}
+        </button>
+      </div>
+      {prompt ? (
+        <p role="status">
+          {t('Sign in to react or save thoughts.')}{' '}
+          <Link href="/log-in" prefetch={false}>
+            {t('Sign in')}
+          </Link>{' '}
+          ·{' '}
+          <Link href="/sign-up" prefetch={false}>
+            {t('Create account')}
+          </Link>
+        </p>
+      ) : null}
       {canManage ? (
         <div className="account-form">
           {editing ? (

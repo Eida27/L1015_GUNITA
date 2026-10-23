@@ -158,6 +158,64 @@ try {
     );
     if (!published.ok) throw new Error('Synthetic publication failed');
     const thought = await published.json();
+    let other, admin;
+    if (process.env.GUNITA_INTERACTION_FIXTURE === 'synthetic-only') {
+      other = {
+        email: `interaction-browser-${randomBytes(8).toString('hex')}@test.invalid`,
+        password: randomBytes(24).toString('hex'),
+      };
+      if (!(await post('/api/auth/sign-up/email', 'POST', other)).ok)
+        throw new Error('Second synthetic registration failed');
+      await fixture.operator.query(
+        'UPDATE "user" SET email_verified=true WHERE email=$1',
+        [other.email],
+      );
+      const otherLogin = await post('/api/auth/sign-in/email', 'POST', other);
+      if (!otherLogin.ok) throw new Error('Second synthetic login failed');
+      const otherCookie = otherLogin.headers
+        .getSetCookie()
+        .map((value) => value.split(';')[0])
+        .join('; ');
+      if (
+        !(
+          await post(
+            '/api/me/consent',
+            'PUT',
+            { version: 'guidelines-2026-10-19' },
+            otherCookie,
+          )
+        ).ok
+      )
+        throw new Error('Second synthetic consent failed');
+      const otherThought = await post(
+        '/api/thoughts',
+        'POST',
+        {
+          body: 'Clearly fictional: another quiet moment.',
+          emotion: 'gratitude',
+          location: { lat: 14.65, lng: 121.03 },
+        },
+        otherCookie,
+      );
+      if (!otherThought.ok)
+        throw new Error('Second synthetic publication failed');
+      other.publicId = (await otherThought.json()).publicId;
+      await post('/api/auth/sign-out', 'POST', {}, otherCookie);
+      admin = {
+        email: `admin-browser-${randomBytes(8).toString('hex')}@test.invalid`,
+        password: randomBytes(24).toString('hex'),
+      };
+      if (!(await post('/api/auth/sign-up/email', 'POST', admin)).ok)
+        throw new Error('Synthetic admin registration failed');
+      await fixture.operator.query(
+        'UPDATE "user" SET email_verified=true WHERE email=$1',
+        [admin.email],
+      );
+      await fixture.operator.query(
+        'UPDATE profiles SET role=\'admin\' WHERE user_id=(SELECT id FROM "user" WHERE email=$1)',
+        [admin.email],
+      );
+    }
     // Only the disposable automated lifecycle exercises a fresh agreement.
     // The retained controller fixture keeps its established consent.
     const needsAgreement =
@@ -180,6 +238,8 @@ try {
         mode: 'LOCAL_PREVIEW',
         consentVersion: 'guidelines-2026-10-19',
         needsAgreement,
+        ...(other ? { other } : {}),
+        ...(admin ? { admin } : {}),
       }),
     );
     await post('/api/auth/sign-out', 'POST', {}, cookie);

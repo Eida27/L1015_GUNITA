@@ -492,6 +492,23 @@ h3 {
   gap: 24px;
   min-width: 0;
 }
+.interaction-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-block: 20px;
+}
+.interaction-controls button[aria-pressed='true'] {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.dashboard-content {
+  min-width: 0;
+  width: 100%;
+}
+.dashboard-content h1 {
+  overflow-wrap: anywhere;
+}
 .account-details {
   font-size: 13px;
   line-height: 1.8;

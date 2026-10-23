@@ -27,6 +27,9 @@ export default function Home() {
         </Link>
         <PreferenceControls />
         <nav className="account-links" aria-label={t('Your account')}>
+          <Link href="/dashboard/thoughts" prefetch={false}>
+            {t('Your active thoughts')}
+          </Link>
           <Link href="/log-in" prefetch={false}>
             {t('Sign in')}
           </Link>
