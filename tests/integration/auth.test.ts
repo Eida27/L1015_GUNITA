@@ -659,7 +659,7 @@ describe('real Better Auth and Mailpit account lifecycle', () => {
       thought,
     ]);
     await db.query(
-      "INSERT INTO reports(thought_id,reporter_user_id,reason) VALUES($1,$2,'other')",
+      "INSERT INTO reports(thought_id,reporter_user_id,reporter_category,reason) VALUES($1,$2,'member','other')",
       [thought, other],
     );
     await post('/api/auth/request-password-reset', { email });

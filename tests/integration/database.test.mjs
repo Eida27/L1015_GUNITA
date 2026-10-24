@@ -232,7 +232,7 @@ describe('real isolated PostgreSQL/PostGIS integrity', () => {
     const row = await thought(author);
     const report = (
       await db.query(
-        "INSERT INTO reports(thought_id,reporter_user_id,resolved_by,reason) VALUES($1,$2,$2,'spam') RETURNING id",
+        "INSERT INTO reports(thought_id,reporter_user_id,resolved_by,reporter_category,reason) VALUES($1,$2,$2,'member','spam') RETURNING id",
         [row.id, member],
       )
     ).rows[0];
@@ -412,7 +412,7 @@ describe('real isolated PostgreSQL/PostGIS integrity', () => {
       row.id,
     ]);
     await db.query(
-      "INSERT INTO reports(thought_id,reporter_user_id,reason) VALUES($1,$2,'spam')",
+      "INSERT INTO reports(thought_id,reporter_user_id,reporter_category,reason) VALUES($1,$2,'member','spam')",
       [row.id, member],
     );
     await db.query('DELETE FROM thoughts WHERE id=$1', [row.id]);

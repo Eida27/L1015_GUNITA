@@ -31,7 +31,7 @@ const policies = {
     title: 'Help and support',
     paragraphs: [
       'Gunita is not an emergency response or crisis counseling service. If you feel unsafe, consider reaching out to a trusted person nearby or seeking local professional support.',
-      'Crisis-resource contacts are intentionally pending verification. No helpline numbers or unverified services are listed in this draft. Phase 7 must verify current Philippine resources and editorial wording before public launch.',
+      'NCMH Crisis Hotline offers free, confidential phone support 24/7 for people in the Philippines experiencing emotional distress.',
     ],
   },
 } as const satisfies Record<
@@ -51,9 +51,29 @@ export function PolicyCopy({ policy }: { policy: Policy }) {
       {content.paragraphs.map((paragraph) => (
         <p key={paragraph}>{t(paragraph)}</p>
       ))}
+      {policy === 'help' ? (
+        <>
+          <h2>NCMH Crisis Hotline</h2>
+          <p>
+            <a href="tel:+63180018881553?oai_link_source=model_response_hotline">
+              1800-1888-1553
+            </a>
+          </p>
+          <p>
+            <a href="https://www.facebook.com/ncmhcrisishotline?mibextid=LQQJ4d&oai_link_source=model_response_hotline">
+              https://www.facebook.com/ncmhcrisishotline?mibextid=LQQJ4d
+            </a>
+          </p>
+          <p>
+            {t(
+              'Resource details checked on 24 October 2026. Contact availability can change. External resource and native-language review is required before public launch.',
+            )}
+          </p>
+        </>
+      ) : null}
       <p className="field-help">
         {t(
-          'This draft has been checked against the local implementation specification; it is not legal advice or certification. External legal, privacy, native-language and crisis-resource review remain launch blockers.',
+          'External legal, privacy, native-language and crisis-resource review is required before public launch. This draft is not legal advice or certification.',
         )}
       </p>
     </article>

@@ -278,6 +278,9 @@ export const reports = pgTable(
     reporterUserId: uuid('reporter_user_id').references(() => user.id, {
       onDelete: 'set null',
     }),
+    reporterCategory: text('reporter_category', {
+      enum: ['guest', 'member'],
+    }).notNull(),
     reason: reportReason('reason').notNull(),
     details: text('details'),
     status: reportStatus('status').notNull().default('open'),
@@ -293,6 +296,14 @@ export const reports = pgTable(
     index('reports_reporter').on(t.reporterUserId),
     index('reports_resolved_by').on(t.resolvedBy),
     check('reports_details_check', sql`length(${t.details})<=500`),
+    check(
+      'reports_category_check',
+      sql`${t.reporterCategory} IN ('guest','member')`,
+    ),
+    check(
+      'reports_guest_identity_check',
+      sql`${t.reporterCategory}='member' OR ${t.reporterUserId} IS NULL`,
+    ),
   ],
 );
 export const adminAudit = pgTable(

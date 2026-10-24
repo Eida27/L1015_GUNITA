@@ -9,6 +9,7 @@
     "pnpm": "11.25.0"
   },
   "scripts": {
+    "admin:bootstrap": "node scripts/admin-bootstrap.mjs",
     "setup": "node scripts/setup.mjs",
     "local": "node scripts/local.mjs",
     "dev": "node scripts/dev.mjs",

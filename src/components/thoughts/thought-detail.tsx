@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import { ReportForm } from '@/components/moderation/report-form';
 import { useEffect, useRef, useState } from 'react';
 import { usePreferences } from '@/components/ui/preferences';
 import { emotions } from '@/lib/map-contract';
@@ -412,6 +413,7 @@ export function ThoughtDetail({
           </button>
         </div>
       ) : null}
+      <ReportForm key={thought.publicId} publicId={thought.publicId} />
       {error ? <p role="alert">{t(error)}</p> : null}
     </article>
   );

@@ -4,6 +4,7 @@ import { randomBytes } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { localTurnstileToken } from '../../src/lib/turnstile-local';
 test.setTimeout(120000);
 test.use({ actionTimeout: 15000 });
 async function emailToken(
@@ -190,7 +191,16 @@ test('HTTP reset revokes every session and verified password deletion cannot be 
     expect(
       (
         await first.post('/api/auth/sign-up/email', {
-          data: { email, password, role: 'admin', name: 'Ignored' },
+          data: {
+            email,
+            password,
+            role: 'admin',
+            name: 'Ignored',
+            turnstileToken: localTurnstileToken(
+              'XXXX.DUMMY.TOKEN.XXXX',
+              'registration',
+            ),
+          },
         })
       ).status(),
     ).toBe(200);

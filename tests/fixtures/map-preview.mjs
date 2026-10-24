@@ -5,6 +5,8 @@ import { randomBytes } from 'node:crypto';
 import { createServer } from 'node:net';
 import { latLngToCell } from 'h3-js';
 import { createMapDatabase } from './map-database.ts';
+import { localTurnstileToken } from '../../src/lib/turnstile-local.ts';
+import { bootstrapAdmin } from '../../scripts/admin-bootstrap-lib.mjs';
 
 // Explicit opt-in only. This file is never imported by product code.
 if (process.env.GUNITA_MAP_FIXTURE !== 'disposable-only')
@@ -121,7 +123,17 @@ try {
       fetch(origin + path, {
         method,
         headers: { origin, cookie, 'content-type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify(
+          path === '/api/auth/sign-up/email'
+            ? {
+                ...body,
+                turnstileToken: localTurnstileToken(
+                  'XXXX.DUMMY.TOKEN.XXXX',
+                  'registration',
+                ),
+              }
+            : body,
+        ),
       });
     if (!(await post('/api/auth/sign-up/email', 'POST', identity)).ok)
       throw new Error('Synthetic registration failed');
@@ -211,10 +223,7 @@ try {
         'UPDATE "user" SET email_verified=true WHERE email=$1',
         [admin.email],
       );
-      await fixture.operator.query(
-        'UPDATE profiles SET role=\'admin\' WHERE user_id=(SELECT id FROM "user" WHERE email=$1)',
-        [admin.email],
-      );
+      await bootstrapAdmin(fixture.operator, admin.email, admin.email);
     }
     // Only the disposable automated lifecycle exercises a fresh agreement.
     // The retained controller fixture keeps its established consent.

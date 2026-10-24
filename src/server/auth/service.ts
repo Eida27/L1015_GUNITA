@@ -8,6 +8,8 @@ import { smtpSender, type EmailSender } from './email';
 import { createLibrary, tokenDigest } from './library';
 import { lockAccount, requireVerifiedMember, type AuthContext } from './guards';
 import { limitAuth } from './rate-limit';
+import { verifyTurnstile } from '@/server/security/abuse';
+import type { TurnstileConfig } from '@/server/security/turnstile';
 
 export type AuthOptions = {
   pool: Pool;
@@ -15,10 +17,15 @@ export type AuthOptions = {
   secret: string;
   smtpPort?: number;
   sendEmail?: EmailSender;
+  turnstile?: TurnstileConfig;
 };
 const emailInput = z.string().trim().toLowerCase().max(254).pipe(z.email());
 const passwordInput = z.string().min(12).max(128);
-const signup = z.object({ email: emailInput, password: passwordInput });
+const signup = z.object({
+  email: emailInput,
+  password: passwordInput,
+  turnstileToken: z.string().max(2048).optional(),
+});
 const emailOnly = z.object({ email: emailInput });
 const tokenInput = z.string().min(1).max(2048);
 const schemas = {
@@ -39,6 +46,8 @@ const receipt = (headers = new Headers()) => {
 };
 
 export function createAuthService(options: AuthOptions) {
+  if (process.env.NODE_ENV === 'production' && !options.turnstile)
+    throw new Error('Registration verification configuration unavailable');
   const { pool, origin, secret } = options;
   const send = options.sendEmail || smtpSender(origin, options.smtpPort);
   async function withAuthTransaction<T>(
@@ -132,6 +141,14 @@ export function createAuthService(options: AuthOptions) {
           secret,
           accountRoute ? 'delete-account' : action,
           body.email || body.token || getSessionCookie(request) || undefined,
+        );
+      if (action === 'sign-up/email' && options.turnstile)
+        await verifyTurnstile(
+          pool,
+          secret,
+          options.turnstile,
+          body.turnstileToken ?? '',
+          'registration',
         );
       // Check delivery for every address, including unknown/duplicate accounts,
       // so an outage cannot turn generic receipts into an enumeration oracle.

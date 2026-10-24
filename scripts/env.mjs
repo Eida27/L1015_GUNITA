@@ -93,6 +93,24 @@ export function validateEnv(input, mode = 'development') {
       invalid.add('MAP_STYLE_URL');
     }
   }
+  if (!production) {
+    if (
+      input.NEXT_PUBLIC_TURNSTILE_SITE_KEY &&
+      input.NEXT_PUBLIC_TURNSTILE_SITE_KEY !== '1x00000000000000000000AA'
+    )
+      invalid.add('NEXT_PUBLIC_TURNSTILE_SITE_KEY');
+    if (
+      input.TURNSTILE_SECRET_KEY &&
+      ![
+        '1x0000000000000000000000000000000AA',
+        '3x0000000000000000000000000000000AA',
+      ].includes(input.TURNSTILE_SECRET_KEY)
+    )
+      invalid.add('TURNSTILE_SECRET_KEY');
+  }
+  // Header trust cannot be enabled without a separately verified origin proxy.
+  if (input.TRUST_PROXY && input.TRUST_PROXY !== 'direct')
+    invalid.add('TRUST_PROXY');
   if (invalid.size)
     throw new Error(`Invalid environment: ${[...invalid].sort().join(', ')}`);
   return { origin: url.origin, port, preview, databaseUrl: input.DATABASE_URL };

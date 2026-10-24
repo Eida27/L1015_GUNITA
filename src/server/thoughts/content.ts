@@ -20,6 +20,9 @@ export function validateThoughtBody(input: string): string {
     ) ||
     /\b(?:kill yourself|you should (?:kill yourself|commit suicide)|i (?:will|am going to) kill you)\b/iu.test(
       normalized,
+    ) ||
+    /\b(?:his|her|their|your) (?:home |private )?address (?:is|:)\s*\d{1,6}\s+[\p{L}\d .-]{1,60}\b(?:street|st|road|rd|avenue|ave|lane|ln)\b/iu.test(
+      normalized,
     )
   )
     throw new ApiError('CONTENT_REJECTED');

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePreferences } from '@/components/ui/preferences';
 import { errorKey, type MessageKey } from '@/lib/i18n/catalog';
 import { useHydrated } from './use-hydrated';
+import { VerificationWidget } from '@/components/ui/verification-widget';
 
 type Mode =
   | 'sign-up'
@@ -72,6 +73,9 @@ export function AuthForm({ mode }: { mode: Mode }) {
     [error, setError] = useState<MessageKey | ''>(''),
     [message, setMessage] = useState<MessageKey | ''>('');
   const token = useRef('');
+  const verification = useRef('');
+  const [verified, setVerified] = useState(false),
+    [verificationAttempt, setVerificationAttempt] = useState(0);
   useEffect(() => {
     if (!token.current)
       token.current =
@@ -90,6 +94,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
       formData = new FormData(form),
       body: Record<string, string> = {};
     if (needsEmail) body.email = String(formData.get('email') || '');
+    if (mode === 'sign-up') body.turnstileToken = verification.current;
     if (needsPassword)
       body[mode === 'reset-password' ? 'newPassword' : 'password'] = String(
         formData.get('password') || '',
@@ -122,6 +127,11 @@ export function AuthForm({ mode }: { mode: Mode }) {
     } catch (error) {
       setError(errorKey(error instanceof Error ? error.message : undefined));
     } finally {
+      if (mode === 'sign-up') {
+        verification.current = '';
+        setVerified(false);
+        setVerificationAttempt((n) => n + 1);
+      }
       setBusy(false);
     }
   }
@@ -231,7 +241,20 @@ export function AuthForm({ mode }: { mode: Mode }) {
               )}
             </p>
           )}
-          <button type="submit" disabled={!hydrated || busy}>
+          {mode === 'sign-up' ? (
+            <VerificationWidget
+              key={verificationAttempt}
+              action="registration"
+              onToken={(value) => {
+                verification.current = value;
+                setVerified(!!value);
+              }}
+            />
+          ) : null}
+          <button
+            type="submit"
+            disabled={!hydrated || busy || (mode === 'sign-up' && !verified)}
+          >
             {busy ? t('Please wait…') : t(copy[mode].button)}
           </button>
         </form>

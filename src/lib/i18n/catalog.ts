@@ -14,6 +14,8 @@ export function browserLocale(languages: readonly string[]): Locale {
 }
 // API messages are never displayed directly: only known, allowlisted codes.
 export const errorKeys = {
+  VERIFICATION_REQUIRED: 'Complete the verification and try again.',
+  VERIFICATION_UNAVAILABLE: 'Verification is unavailable. Please try again.',
   GUIDELINES_REQUIRED:
     'Accept the current Community Guidelines before publishing.',
   POST_LIMIT_REACHED:

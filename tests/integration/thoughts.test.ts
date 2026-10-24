@@ -380,7 +380,7 @@ it('never serves hidden or exact-expiry detail and cleanup drains dependent live
     [authorId, expired],
   );
   await fixture.operator.query(
-    "INSERT INTO reports(thought_id,reason) VALUES($1,'other')",
+    "INSERT INTO reports(thought_id,reporter_category,reason) VALUES($1,'guest','other')",
     [expired],
   );
   const loadedModule =

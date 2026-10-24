@@ -1,4 +1,12 @@
 const errors = {
+  VERIFICATION_REQUIRED: {
+    status: 403,
+    message: 'Complete the verification and try again.',
+  },
+  VERIFICATION_UNAVAILABLE: {
+    status: 503,
+    message: 'Verification is unavailable. Please try again.',
+  },
   GUIDELINES_REQUIRED: {
     status: 403,
     message: 'Accept the current Community Guidelines before publishing.',

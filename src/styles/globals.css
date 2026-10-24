@@ -939,3 +939,23 @@ button {
   border: 1px solid currentColor;
   border-radius: 0.5rem;
 }
+.account-card details {
+  margin-top: 1rem;
+}
+.account-card summary {
+  cursor: pointer;
+  min-height: 44px;
+  padding: 0.6rem 0;
+}
+.verification-widget {
+  max-width: 100%;
+}
+.policy-copy a {
+  overflow-wrap: anywhere;
+}
+.dashboard-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-block: 1rem;
+}
