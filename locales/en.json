@@ -263,5 +263,11 @@
   "No reports to show.": "No reports to show.",
   "Next page": "Next page",
   "Back to first page": "Back to first page",
-  "Refresh": "Refresh"
+  "Refresh": "Refresh",
+  "Administrator": "Administrator",
+  "No accounts to show.": "No accounts to show.",
+  "Subject": "Subject",
+  "Account reference": "Account reference",
+  "Reported and suspended accounts.": "Reported and suspended accounts.",
+  "Unavailable": "Unavailable"
 }

@@ -73,7 +73,10 @@ export const reportsResponseSchema = z
   })
   .strict();
 export const accountsResponseSchema = z
-  .object({ items: z.array(adminAccountSchema).max(20) })
+  .object({
+    items: z.array(adminAccountSchema).max(20),
+    nextCursor: z.uuid().nullable(),
+  })
   .strict();
 export const auditResponseSchema = z
   .object({
@@ -93,6 +96,10 @@ export const auditResponseSchema = z
               'bootstrap_admin',
             ]),
             subjectKind: z.enum(['thought', 'account', 'report']),
+            subjectReference: z
+              .union([z.uuid(), z.string().regex(/^t_[A-Za-z0-9_-]{22,64}$/)])
+              .nullable(),
+            actorId: z.uuid().nullable(),
             reasonCode: z.string().regex(/^[A-Z][A-Z0-9_]{0,63}$/),
             changedStatus: z
               .enum([

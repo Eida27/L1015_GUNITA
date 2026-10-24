@@ -92,6 +92,9 @@ test('guest report uses the actual official widget and generic receipt; Help con
   page,
 }) => {
   test.setTimeout(90000);
+  await page
+    .context()
+    .addCookies([{ name: 'theme', value: 'dark', url: origin }]);
   await enter(page, identity.thoughtUrl);
   await page.getByText('Report thought', { exact: true }).click();
   await page
@@ -276,4 +279,68 @@ test('registration uses the actual widget before private email verification in t
     data: { password: account.password },
   });
   expect(result.status()).toBe(200);
+});
+
+test('account console can unsuspend after the last reported thought is deleted and history shows nullable references', async ({
+  page,
+}) => {
+  test.setTimeout(90000);
+  await login(page, identity.admin);
+  await enter(page, origin + '/admin');
+  const report = page
+    .locator('article.account-card')
+    .filter({ hasText: 'Clearly fictional moderation review fixture.' });
+  await expect(report).toBeVisible();
+  async function apply(action: string) {
+    await report
+      .getByRole('combobox', { name: 'Moderation action', exact: true })
+      .selectOption(action);
+    await report
+      .getByRole('combobox', { name: 'Justification', exact: true })
+      .selectOption('OTHER');
+    if (action === 'delete') await report.getByRole('checkbox').check();
+    await report
+      .getByRole('button', { name: 'Apply action', exact: true })
+      .click();
+  }
+  await apply('suspend');
+  await expect(
+    report.getByText('Account status: Suspended', { exact: true }),
+  ).toBeVisible();
+  await apply('delete');
+  await expect(report).toHaveCount(0);
+  await page
+    .getByRole('link', { name: 'Reported accounts', exact: true })
+    .click();
+  const account = page.locator('article.account-card');
+  await expect(account).toHaveCount(1);
+  await expect(
+    account.getByText('Account status: Suspended', { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText('Clearly fictional moderation review fixture.', {
+      exact: true,
+    }),
+  ).toHaveCount(0);
+  await account
+    .getByRole('combobox', { name: 'Justification', exact: true })
+    .selectOption('NO_VIOLATION');
+  await account
+    .getByRole('button', { name: 'Unsuspend account', exact: true })
+    .click();
+  await expect(account).toHaveCount(0);
+  await page
+    .getByRole('link', { name: 'Moderation history', exact: true })
+    .click();
+  const audit = page.locator('li').filter({ hasText: 'unsuspend' });
+  await expect(audit).toContainText('Administrator:');
+  await expect(audit).toContainText('Subject:');
+  await expect(audit).toContainText(/[0-9a-f]{8}-[0-9a-f-]{27}/);
+  const deleted = page.locator('li').filter({ hasText: 'delete_thought' });
+  await expect(deleted).toContainText('Subject: Unavailable');
+  await expect(
+    page.getByText('Clearly fictional moderation review fixture.', {
+      exact: true,
+    }),
+  ).toHaveCount(0);
 });

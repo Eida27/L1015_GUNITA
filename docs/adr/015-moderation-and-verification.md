@@ -14,6 +14,10 @@ Bootstrap is operator-only: `pnpm admin:bootstrap --email <exact verified email>
 
 The existing maintenance process removes expired thoughts and dependent reports, counters at expiry, and audit events older than 90 days. Foreign keys clear audit linkage on deletion. Audit rows never contain authored body, details, email, token, IP or location copies. Migration0007 adds immutable original reporter category (guest/member); no web grant expansion.
 
+The account console independently lists suspended accounts and authors with current reported thoughts, in bounded 20-item UUID-cursor pages. It selects only existing account ID, pseudonym, role and status; deletion or expiry of the last report cannot remove the operator's unsuspend path. Active accounts without current reports leave the listing. It is not a general identity directory. History exposes the existing nullable administrator UUID and subject reference (account/report UUID or joined thought public ID), never copied labels or content. Existing foreign-key erasure removes those references after deletion.
+
+Report submission uses Better Auth's cookie parser and its configured session-cookie name to choose the member path. Unrelated cookies remain guest requests; a present session cookie, including an empty value, requires the existing fresh member guard. Invalid, revoked, unverified and suspended credentials do not fall back to guest reporting.
+
 ## Explicit official-test envelope
 
 Controller ruling 7 permits official test keys only for loopback APP_ORIGIN in development/test or production artifact execution with LOCAL_PREVIEW=true. The validated local launcher binds loopback. The public always-pass site/secret pair is the local default; the documented spent-token secret is accepted only in that local configuration for rejection testing. Nonlocal production rejects official test keys and requires HTTPS configuration.

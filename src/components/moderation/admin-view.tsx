@@ -11,8 +11,10 @@ import { usePreferences } from '@/components/ui/preferences';
 import {
   reportsResponseSchema,
   auditResponseSchema,
+  accountsResponseSchema,
   reasonCodes,
   type AdminReport,
+  type AdminAccount,
 } from '@/lib/moderation-contract';
 import { mutationReceiptSchema } from '@/lib/thought-contract';
 import { errorKey, type MessageKey } from '@/lib/i18n/catalog';
@@ -35,6 +37,84 @@ const statusText = {
   active: 'Active',
   suspended: 'Suspended',
 } as const;
+function AccountCard({
+  account,
+  onChange,
+}: {
+  account: AdminAccount;
+  onChange: () => void;
+}) {
+  const { t } = usePreferences();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<MessageKey | ''>('');
+  return (
+    <article className="account-card">
+      <h2>{account.pseudonym}</h2>
+      <p>
+        {t('Account reference')}: {account.id}
+      </p>
+      <p>
+        {t('Account status')}: {t(statusText[account.status])}
+      </p>
+      <form
+        className="account-form"
+        method="post"
+        onSubmit={async (event) => {
+          event.preventDefault();
+          const reasonCode = new FormData(event.currentTarget).get(
+            'reasonCode',
+          );
+          setBusy(true);
+          setError('');
+          try {
+            const response = await fetch(
+              `/api/admin/accounts/${account.id}/suspension`,
+              {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                cache: 'no-store',
+                body: JSON.stringify({
+                  suspended: account.status !== 'suspended',
+                  reasonCode,
+                }),
+              },
+            );
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.code);
+            mutationReceiptSchema.parse(result);
+            onChange();
+          } catch (error) {
+            setError(
+              errorKey(error instanceof Error ? error.message : undefined),
+            );
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        <label>
+          {t('Justification')}
+          <select name="reasonCode" required defaultValue="">
+            <option value="">{t('Choose a reason')}</option>
+            {reasonCodes.map((reason) => (
+              <option key={reason} value={reason}>
+                {t(reasonText[reason])}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button disabled={busy}>
+          {t(
+            account.status === 'suspended'
+              ? 'Unsuspend account'
+              : 'Suspend account',
+          )}
+        </button>
+        {error ? <p role="alert">{t(error)}</p> : null}
+      </form>
+    </article>
+  );
+}
 function ReportCard({
   report,
   onChange,
@@ -181,6 +261,9 @@ function AdminContent({
     [audits, setAudits] = useState<z.infer<typeof auditResponseSchema> | null>(
       null,
     ),
+    [accounts, setAccounts] = useState<z.infer<
+      typeof accountsResponseSchema
+    > | null>(null),
     [error, setError] = useState<MessageKey | ''>(''),
     [cursor, setCursor] = useState<string | null>(null),
     [attempt, setAttempt] = useState(0);
@@ -191,6 +274,7 @@ function AdminContent({
     const clear = () => {
       setReports(null);
       setAudits(null);
+      setAccounts(null);
     };
     const refresh = () => {
       clear();
@@ -210,7 +294,7 @@ function AdminContent({
       !combined.aborted && !document.hidden && store.isAcknowledged();
     if (active())
       fetch(
-        `/api/admin/${kind === 'audit' ? 'audit' : 'reports'}${cursor ? '?cursor=' + encodeURIComponent(cursor) : ''}`,
+        `/api/admin/${kind}${cursor ? '?cursor=' + encodeURIComponent(cursor) : ''}`,
         { cache: 'no-store', signal: combined },
       )
         .then(async (response) => {
@@ -218,6 +302,8 @@ function AdminContent({
           if (!response.ok) throw new Error(data.code);
           if (!active()) return;
           if (kind === 'audit') setAudits(auditResponseSchema.parse(data));
+          else if (kind === 'accounts')
+            setAccounts(accountsResponseSchema.parse(data));
           else setReports(reportsResponseSchema.parse(data));
         })
         .catch((error) => {
@@ -252,11 +338,13 @@ function AdminContent({
   function refresh() {
     setReports(null);
     setAudits(null);
+    setAccounts(null);
     setError('');
     setAttempt((n) => n + 1);
     heading.current?.focus();
   }
-  const result = kind === 'audit' ? audits : reports;
+  const result =
+    kind === 'audit' ? audits : kind === 'accounts' ? accounts : reports;
   return (
     <>
       <h1 tabIndex={-1} ref={heading}>
@@ -284,7 +372,9 @@ function AdminContent({
       </nav>
       <p>
         {t(
-          'Reports do not automatically hide thoughts. Review the context and select a justification for each action.',
+          kind === 'accounts'
+            ? 'Reported and suspended accounts.'
+            : 'Reports do not automatically hide thoughts. Review the context and select a justification for each action.',
         )}
       </p>
       {error ? (
@@ -292,10 +382,19 @@ function AdminContent({
       ) : !result ? (
         <p role="status">{t('Please wait…')}</p>
       ) : !result.items.length ? (
-        <p>{t('No reports to show.')}</p>
+        <p>
+          {t(
+            kind === 'accounts'
+              ? 'No accounts to show.'
+              : 'No reports to show.',
+          )}
+        </p>
       ) : null}
       {reports?.items.map((report) => (
         <ReportCard key={report.id} report={report} onChange={refresh} />
+      ))}
+      {accounts?.items.map((account) => (
+        <AccountCard key={account.id} account={account} onChange={refresh} />
       ))}
       {audits ? (
         <ul>
@@ -303,6 +402,13 @@ function AdminContent({
             <li key={item.id}>
               {item.action} · {item.reasonCode} · {item.changedStatus ?? '—'} ·{' '}
               {item.createdAt}
+              <p>
+                {t('Subject')}: {item.subjectReference ?? t('Unavailable')} ·{' '}
+                {item.subjectKind}
+              </p>
+              <p>
+                {t('Administrator')}: {item.actorId ?? t('Unavailable')}
+              </p>
             </li>
           ))}
         </ul>
@@ -312,6 +418,7 @@ function AdminContent({
           onClick={() => {
             setReports(null);
             setAudits(null);
+            setAccounts(null);
             setCursor(result.nextCursor);
           }}
         >
@@ -323,6 +430,7 @@ function AdminContent({
           onClick={() => {
             setReports(null);
             setAudits(null);
+            setAccounts(null);
             setCursor(null);
           }}
         >

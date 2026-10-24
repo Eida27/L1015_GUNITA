@@ -1,4 +1,5 @@
 import type { Pool } from 'pg';
+import { parseCookies } from 'better-auth/cookies';
 import { parseJsonBody } from '@/lib/validation/json';
 import {
   reportInputSchema,
@@ -43,7 +44,10 @@ export async function submitReport(
   );
   return options.auth.withAuthTransaction(async (context) => {
     const { client } = context;
-    const actor = request.headers.get('cookie')
+    const { authCookies } = await context.auth.$context;
+    const actor = parseCookies(request.headers.get('cookie') ?? '').has(
+      authCookies.sessionToken.name,
+    )
       ? await requireVerifiedMember(context, request.headers)
       : null;
     if (actor)

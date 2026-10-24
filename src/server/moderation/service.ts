@@ -199,7 +199,10 @@ export function createModerationService(options: {
         if (url.pathname === '/api/admin/audit' && request.method === 'GET') {
           const rows = (
             await db.query(
-              'SELECT id,action,subject_kind AS "subjectKind",reason_code AS "reasonCode",changed_status AS "changedStatus",created_at AS "createdAt" FROM admin_audit WHERE created_at>statement_timestamp()-interval \'90 days\' AND ($1::uuid IS NULL OR id<$1::uuid) ORDER BY id DESC LIMIT 21',
+              `SELECT a.id,a.action,a.subject_kind AS "subjectKind",a.reason_code AS "reasonCode",a.changed_status AS "changedStatus",a.created_at AS "createdAt",
+                a.admin_user_id AS "actorId",CASE WHEN a.subject_kind='thought' THEN t.public_id ELSE COALESCE(a.subject_user_id,a.subject_report_id)::text END AS "subjectReference"
+                FROM admin_audit a LEFT JOIN thoughts t ON t.id=a.subject_thought_id
+                WHERE a.created_at>statement_timestamp()-interval '90 days' AND ($1::uuid IS NULL OR a.id<$1::uuid) ORDER BY a.id DESC LIMIT 21`,
               [cursor],
             )
           ).rows;
@@ -214,15 +217,22 @@ export function createModerationService(options: {
           url.pathname === '/api/admin/accounts' &&
           request.method === 'GET'
         ) {
-          const reports = await inspectReports(context, actor.userId, cursor);
+          // Actionable moderation only: suspension survives report deletion/expiry.
+          // No thought text, email, or historical identity copies are selected.
+          const rows = (
+            await db.query(
+              `SELECT p.user_id AS id,p.pseudonym,p.role,p.status FROM profiles p
+             WHERE (p.status='suspended' OR EXISTS (
+               SELECT 1 FROM thoughts t JOIN reports r ON r.thought_id=t.id
+               WHERE t.author_id=p.user_id AND t.expires_at>statement_timestamp()
+             )) AND ($1::uuid IS NULL OR p.user_id<$1::uuid)
+             ORDER BY p.user_id DESC LIMIT 21`,
+              [cursor],
+            )
+          ).rows;
           return privateJson(accountsResponseSchema, {
-            items: [
-              ...new Map(
-                reports.items
-                  .filter((r) => r.author)
-                  .map((r) => [r.author!.id, r.author!]),
-              ).values(),
-            ],
+            items: rows.slice(0, 20),
+            nextCursor: rows.length > 20 ? rows[19].id : null,
           });
         }
         if (url.pathname === '/api/admin/reports' && request.method === 'GET')

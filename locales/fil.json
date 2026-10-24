@@ -263,5 +263,11 @@
   "No reports to show.": "Walang ulat na maipapakita.",
   "Next page": "Susunod na pahina",
   "Back to first page": "Bumalik sa unang pahina",
-  "Refresh": "I-refresh"
+  "Refresh": "I-refresh",
+  "Administrator": "Tagapangasiwa",
+  "No accounts to show.": "Walang account na maipapakita.",
+  "Subject": "Paksa",
+  "Account reference": "Sanggunian ng account",
+  "Reported and suspended accounts.": "Mga account na naiulat o nasuspinde.",
+  "Unavailable": "Hindi available"
 }
