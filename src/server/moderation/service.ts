@@ -61,6 +61,41 @@ export async function requireAdminWithTarget(
   );
   return requireAdmin(context, headers);
 }
+const actionableAccount = `(p.status='suspended' OR EXISTS (
+  SELECT 1 FROM thoughts t JOIN reports r ON r.thought_id=t.id
+  WHERE t.author_id=p.user_id AND t.expires_at>statement_timestamp()
+))`;
+async function prepareAccountInspection(
+  context: AuthContext,
+  headers: Headers,
+  cursor: string | null,
+) {
+  const session = await context.auth.api.getSession({
+    headers,
+    query: { disableCookieCache: true, disableRefresh: true },
+  });
+  if (!session) throw new ApiError('UNAUTHENTICATED');
+  const candidates = (
+    await context.client.query<{ id: string }>(
+      `SELECT p.user_id AS id FROM profiles p WHERE ${actionableAccount}
+     AND ($1::uuid IS NULL OR p.user_id<$1::uuid) ORDER BY p.user_id DESC LIMIT 21`,
+      [cursor],
+    )
+  ).rows;
+  const ids = candidates.slice(0, 20).map((row) => row.id);
+  // Audit subject FKs acquire user locks too. Lock the whole bounded page plus
+  // actor in stable order before the ordinary guard takes its account lock.
+  await context.client.query(
+    'SELECT id FROM "user" WHERE id=ANY($1::uuid[]) ORDER BY id FOR UPDATE',
+    [[session.user.id, ...ids]],
+  );
+  const actor = await requireAdmin(context, headers);
+  return {
+    actor,
+    ids,
+    nextCursor: candidates.length > 20 ? candidates[19].id : null,
+  };
+}
 export function createModerationService(options: {
   auth: Pick<ReturnType<typeof createAuthService>, 'withAuthTransaction'>;
   origin: string;
@@ -112,9 +147,15 @@ export function createModerationService(options: {
         await context.client.query(
           'SET TRANSACTION ISOLATION LEVEL READ COMMITTED',
         );
-        const actor = target
-          ? await requireAdminWithTarget(context, request.headers, target)
-          : await requireAdmin(context, request.headers);
+        const accountPage =
+          url.pathname === '/api/admin/accounts' && request.method === 'GET'
+            ? await prepareAccountInspection(context, request.headers, cursor)
+            : null;
+        const actor = accountPage
+          ? accountPage.actor
+          : target
+            ? await requireAdminWithTarget(context, request.headers, target)
+            : await requireAdmin(context, request.headers);
         const db = context.client;
         if (reportId && input && 'status' in input) {
           const found = (
@@ -213,26 +254,32 @@ export function createModerationService(options: {
             nextCursor: rows.length > 20 ? rows[19].id : null,
           });
         }
-        if (
-          url.pathname === '/api/admin/accounts' &&
-          request.method === 'GET'
-        ) {
+        if (accountPage) {
           // Actionable moderation only: suspension survives report deletion/expiry.
           // No thought text, email, or historical identity copies are selected.
           const rows = (
             await db.query(
               `SELECT p.user_id AS id,p.pseudonym,p.role,p.status FROM profiles p
-             WHERE (p.status='suspended' OR EXISTS (
-               SELECT 1 FROM thoughts t JOIN reports r ON r.thought_id=t.id
-               WHERE t.author_id=p.user_id AND t.expires_at>statement_timestamp()
-             )) AND ($1::uuid IS NULL OR p.user_id<$1::uuid)
-             ORDER BY p.user_id DESC LIMIT 21`,
-              [cursor],
+             WHERE ${actionableAccount} AND p.user_id=ANY($1::uuid[])
+             ORDER BY p.user_id DESC`,
+              [accountPage.ids],
             )
           ).rows;
+          for (const row of rows)
+            await audit(
+              db,
+              actor.userId,
+              'review_report',
+              'account',
+              row.id,
+              'INSPECT',
+              null,
+            );
+          // Validate before committing access events; a failed write or DTO
+          // validation rolls back the entire transaction without disclosure.
           return privateJson(accountsResponseSchema, {
-            items: rows.slice(0, 20),
-            nextCursor: rows.length > 20 ? rows[19].id : null,
+            items: rows,
+            nextCursor: accountPage.nextCursor,
           });
         }
         if (url.pathname === '/api/admin/reports' && request.method === 'GET')

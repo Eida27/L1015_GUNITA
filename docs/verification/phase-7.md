@@ -1,5 +1,15 @@
 # Phase 7: reports, moderation and anti-abuse
 
+## Review fix round 2
+
+Scoped review accepted I1–I3 but found the new independent account list omitted the prior identity-access audit trail. R1 now records an attributable, content-free per-account `review_report` / `INSPECT` event transactionally before validating and returning the private DTO. Failed audit writes return a generic private500 with no identities, and roll back earlier writes from that request. Existing nullable foreign keys erase subject/actor linkage on deletion.
+
+Adding subject-user audit FKs also requires the existing account lock order: bounded read-only candidate/actor discovery, sorted user-row locks **before** the admin guard, fresh authorization, and an eligibility requery restricted to the locked candidate page. The 20-item limit and original keyset boundary remain; no stale or newly discovered identity is substituted after locking. No schema, grants, stored identity/content copies or retention change.
+
+Focused `moderation-review.test.ts`: initial RED2failed/3passed69.95s; controlled-lock RED3failed/3passed19.48s; GREEN **6/6,16.04s,exit0**. Both two-admin actor directions observe one blocked request through actual `pg_blocking_pids`, then complete200/200. A real DB trigger rejects the second inspection audit, proving rollback of the first and no disclosure. Successful actor/subject events and deletion-erased links pass the strict history DTO. Original guest/member and account expiry/deletion regressions remain covered. Scoped ESLint on the two changed TypeScript files and global `tsc --noEmit` each exited0 without diagnostics; diff whitespace checks passed.
+
+Per controller scope, no build, E2E, full-auth or full-suite repeat is performed for this server fix. The retained `bc5e559` standalone artifact and its passing fix1 receipts **predate fix2** and do not prove the new server behavior. Final-source build and independent Browser acceptance remain open for the next consolidated quality pass. Actual Browser tab creation is still rejected by the disabled Work setting, including after the user reported enabling it; no workaround or acceptance claim.
+
 ## Review fix round 1
 
 Review of `d5b1934` found three important workflow defects: suspended authors disappeared after their last report expired/deleted; history omitted subject/administrator references; unrelated cookies rejected guest reports. All three were reproduced through real boundaries before correction. `moderation-review.test.ts` RED: 4 failed, 54.17s, exit1. The original standalone UI also reproduced suspend → delete last reported thought → empty account screen (1 failed, flow14.3s, exit1).
