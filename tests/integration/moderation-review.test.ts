@@ -1,12 +1,15 @@
 import { afterAll, beforeAll, expect, it, vi } from 'vitest';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { createMapDatabase } from '../fixtures/map-database';
 import { createAuthService } from '../../src/server/auth/service';
 import { createThoughtService } from '../../src/server/thoughts/service';
 import { createModerationService } from '../../src/server/moderation/service';
 import { turnstileConfig } from '../../src/server/security/turnstile';
 import { localTurnstileToken } from '../../src/lib/turnstile-local';
-import { auditResponseSchema } from '../../src/lib/moderation-contract';
+import {
+  accountsResponseSchema,
+  auditResponseSchema,
+} from '../../src/lib/moderation-contract';
 vi.mock('server-only', () => ({}));
 const origin = 'http://127.0.0.1:3000';
 let db: Awaited<ReturnType<typeof createMapDatabase>>;
@@ -507,3 +510,101 @@ it('distinguishes subjects and administrators in history while erasing deleted l
   ])
     expect(json).not.toContain(value);
 });
+
+it.each(['deletion', 'ineligible', 'empty'])(
+  'only continues from an audited survivor when a 21-account page shrinks by %s while waiting for locks',
+  async (mode) => {
+    const ids = Array.from({ length: 21 }, () => randomUUID())
+      .sort()
+      .reverse();
+    await db.operator.query(
+      `INSERT INTO "user"(id,name,email,email_verified)
+      SELECT id,'Fictional pagination fixture',id::text||'@test.invalid',true FROM unnest($1::uuid[]) id`,
+      [ids],
+    );
+    // The authoritative account_profile trigger creates each profile/identity.
+    await db.operator.query(
+      "UPDATE profiles SET status='suspended' WHERE user_id=ANY($1::uuid[])",
+      [ids],
+    );
+    const removed = mode === 'empty' ? ids.slice(0, 20) : [ids[19]];
+    let pending: Promise<Response> | undefined;
+    let committed = false;
+    try {
+      await db.operator.query('BEGIN');
+      await db.operator.query(
+        'SELECT id FROM "user" WHERE id=ANY($1::uuid[]) ORDER BY id FOR UPDATE',
+        [removed],
+      );
+      const blockerPid = (
+        await db.operator.query('SELECT pg_backend_pid() pid')
+      ).rows[0].pid;
+      pending = handle(req('/api/admin/accounts'));
+      // Actual lock wait establishes discovery happened before the concurrent change.
+      await vi.waitFor(
+        async () => {
+          const result = await db.pool.query(
+            'SELECT count(*)::int n FROM pg_stat_activity WHERE datname=current_database() AND $1=ANY(pg_blocking_pids(pid))',
+            [blockerPid],
+          );
+          expect(result.rows[0].n).toBe(1);
+        },
+        { timeout: 3000, interval: 20 },
+      );
+      if (mode === 'ineligible')
+        await db.operator.query(
+          "UPDATE profiles SET status='active' WHERE user_id=ANY($1::uuid[])",
+          [removed],
+        );
+      else
+        await db.operator.query('DELETE FROM "user" WHERE id=ANY($1::uuid[])', [
+          removed,
+        ]);
+      await db.operator.query('COMMIT');
+      committed = true;
+      const response = await pending;
+      expect(response.status).toBe(200);
+      const first = accountsResponseSchema.parse(await response.json());
+      for (const id of removed) expect(JSON.stringify(first)).not.toContain(id);
+      expect(first.items.map((account) => account.id)).toEqual(
+        mode === 'empty' ? [] : ids.slice(0, 19),
+      );
+      expect(first.nextCursor).toBe(mode === 'empty' ? null : ids[18]);
+      if (mode === 'empty') {
+        // Privacy-preserving empty response terminates this page; a fresh listing can restart.
+        const restarted = accountsResponseSchema.parse(
+          await (await handle(req('/api/admin/accounts'))).json(),
+        );
+        expect(restarted.items.map((account) => account.id)).toEqual([ids[20]]);
+        expect(restarted.nextCursor).toBeNull();
+      } else {
+        const second = accountsResponseSchema.parse(
+          await (
+            await handle(req('/api/admin/accounts?cursor=' + first.nextCursor))
+          ).json(),
+        );
+        expect(second.items.map((account) => account.id)).toEqual([ids[20]]);
+        expect(second.nextCursor).toBeNull();
+        const traversed = [...first.items, ...second.items].map(
+          (account) => account.id,
+        );
+        expect(traversed).toEqual(ids.filter((id) => !removed.includes(id)));
+        expect(new Set(traversed).size).toBe(traversed.length);
+      }
+      const audits = (
+        await db.operator.query(
+          "SELECT subject_user_id FROM admin_audit WHERE admin_user_id=$1 AND subject_kind='account' AND reason_code='INSPECT' AND subject_user_id=ANY($2::uuid[]) ORDER BY subject_user_id DESC",
+          [actors[1].id, ids],
+        )
+      ).rows.map((row) => row.subject_user_id);
+      expect(audits).toEqual(ids.filter((id) => !removed.includes(id)));
+    } finally {
+      if (!committed) await db.operator.query('ROLLBACK');
+      await pending;
+      await db.operator.query('DELETE FROM "user" WHERE id=ANY($1::uuid[])', [
+        ids,
+      ]);
+    }
+  },
+  15000,
+);

@@ -93,7 +93,7 @@ async function prepareAccountInspection(
   return {
     actor,
     ids,
-    nextCursor: candidates.length > 20 ? candidates[19].id : null,
+    hasMore: candidates.length > 20,
   };
 }
 export function createModerationService(options: {
@@ -279,7 +279,9 @@ export function createModerationService(options: {
           // validation rolls back the entire transaction without disclosure.
           return privateJson(accountsResponseSchema, {
             items: rows,
-            nextCursor: accountPage.nextCursor,
+            // A cursor is an identity disclosure too: use only a fresh, audited
+            // survivor. If the page vanished, return empty and allow Refresh.
+            nextCursor: accountPage.hasMore ? (rows.at(-1)?.id ?? null) : null,
           });
         }
         if (url.pathname === '/api/admin/reports' && request.method === 'GET')
