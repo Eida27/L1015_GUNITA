@@ -1,11 +1,13 @@
+import { observeRequest } from '@/server/security/request-log';
 import { z } from 'zod';
 import { parseJsonBody } from '@/lib/validation/json';
 import { ApiError, errorResponse } from '@/lib/api/errors';
 import { coarsenPhilippinesPoint, LocationError } from '@/server/geo/privacy';
 import { getMapDatabase } from '@/server/geo/runtime';
 import { limitMapRequests } from '@/server/geo/limits';
+import { coarsePreviewSchema } from '@/lib/map-contract';
 export const runtime = 'nodejs';
-export async function POST(request: Request) {
+async function handle(request: Request) {
   try {
     if (request.headers.get('origin') !== process.env.APP_ORIGIN)
       throw new ApiError('FORBIDDEN');
@@ -19,7 +21,11 @@ export async function POST(request: Request) {
     const point = await coarsenPhilippinesPoint(getMapDatabase(), lat, lng);
     // The preview exposes only its safe display point, not the origin cell.
     return Response.json(
-      { lat: point.lat, lng: point.lng, label: point.label },
+      coarsePreviewSchema.parse({
+        lat: point.lat,
+        lng: point.lng,
+        label: point.label,
+      }),
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch (error) {
@@ -31,3 +37,6 @@ export async function POST(request: Request) {
     return errorResponse(error);
   }
 }
+
+export const POST = (request: Request) =>
+  observeRequest('map', () => handle(request));

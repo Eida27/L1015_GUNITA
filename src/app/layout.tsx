@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { connection } from 'next/server';
 import '@/styles/globals.css';
 import { PreferencesProvider, Text } from '@/components/ui/preferences';
 
@@ -9,9 +10,10 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  await connection();
   return (
     <html lang="en" data-scroll-behavior="smooth">
       <body>

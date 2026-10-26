@@ -2,6 +2,7 @@ import 'server-only';
 import pg from 'pg';
 import { createAuthService } from './service';
 import { turnstileConfig } from '@/server/security/turnstile';
+import { observeRequest } from '@/server/security/request-log';
 
 let service: ReturnType<typeof createAuthService> | undefined;
 export function getAuthService() {
@@ -21,5 +22,9 @@ export function getAuthService() {
       turnstile: turnstileConfig(process.env),
     });
   }
-  return service;
+  const handle = service.handle;
+  return {
+    ...service,
+    handle: (request: Request) => observeRequest('auth', () => handle(request)),
+  };
 }

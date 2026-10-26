@@ -7,6 +7,7 @@ import { latLngToCell } from 'h3-js';
 import { createMapDatabase } from './map-database.ts';
 import { localTurnstileToken } from '../../src/lib/turnstile-local.ts';
 import { bootstrapAdmin } from '../../scripts/admin-bootstrap-lib.mjs';
+import { seedScaleDatabase } from './scale-database.mjs';
 
 // Explicit opt-in only. This file is never imported by product code.
 if (process.env.GUNITA_MAP_FIXTURE !== 'disposable-only')
@@ -61,6 +62,7 @@ child.on('exit', () => {
   if (!closing) void shutdown(1);
 });
 try {
+  const coldStarted = performance.now();
   for (let i = 0; i < 60; i++) {
     try {
       if ((await fetch(`${origin}/api/ready`)).ok) break;
@@ -69,6 +71,35 @@ try {
   }
   if (!(await fetch(`${origin}/api/ready`)).ok)
     throw new Error('Fixture startup unavailable');
+  if (process.env.GUNITA_SCALE_FIXTURE === 'synthetic-10500') {
+    if (port !== '3002')
+      throw new Error('Scale proof requires disposable automation port');
+    const coldReadyMs = performance.now() - coldStarted;
+    const firstMap = performance.now();
+    const emptyMap = await fetch(
+      `${origin}/api/map/pins?bbox=-180,-85,180,85&zoom=1`,
+    );
+    if (!emptyMap.ok) throw new Error('Cold map unavailable');
+    await emptyMap.json();
+    const coldFirstMapMs = performance.now() - firstMap;
+    const seeded = await seedScaleDatabase(
+      fixture,
+      async (lat, lng) => {
+        const response = await fetch(`${origin}/api/map/preview`, {
+          method: 'POST',
+          headers: { origin, 'content-type': 'application/json' },
+          body: JSON.stringify({ lat, lng }),
+        });
+        if (!response.ok) throw new Error('Scale privacy preview failed');
+        return response.json();
+      },
+      'synthetic-test-only',
+    );
+    await writeFile(
+      '.local/phase-8-scale-startup.json',
+      JSON.stringify({ coldReadyMs, coldFirstMapMs, seeded }),
+    );
+  }
   const chosen = [
     [14.5995, 120.9842],
     [14.65, 121.03],

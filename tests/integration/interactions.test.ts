@@ -387,3 +387,86 @@ it('hides removed content immediately from all lists and totals, and excludes ha
       .n,
   ).toBe(0);
 });
+
+it('paginates 21 real own and bookmarked rows with a 20-item cap, no duplicates and no foreign, hidden or expired content', async () => {
+  const { coarsenPhilippinesPoint } =
+    await import('../../src/server/geo/privacy');
+  const point = await coarsenPhilippinesPoint(db.pool, 14.6, 120.98);
+  const own: string[] = [],
+    saved: string[] = [];
+  // Explicit historical test data only; each batch consumes the real quota,
+  // then ages its creation events to simulate publications on previous days.
+  for (let index = 0; index < 24; index++) {
+    for (const actor of [0, 2]) {
+      await db.operator.query(
+        "UPDATE post_quota_events SET created_at=statement_timestamp()-interval '25 hours' WHERE author_id=$1",
+        [actors[actor].id],
+      );
+      const publicId = `t_${randomBytes(16).toString('hex')}`;
+      await db.operator.query(
+        `INSERT INTO thoughts(public_id,author_id,body,emotion,public_point,privacy_cell,privacy_tier,privacy_algorithm_version,location_label,created_at,status) VALUES($1,$2,'Clearly fictional pagination fixture','hope',ST_SetSRID(ST_MakePoint($3,$4),4326),$5,$6,1,$7,statement_timestamp()-($8::int*interval '1 day'),$9)`,
+        [
+          publicId,
+          actors[actor].id,
+          point.lng,
+          point.lat,
+          point.privacyCell,
+          point.privacyTier,
+          point.label,
+          index === 23 ? 31 : 1,
+          index === 22 ? 'hidden' : 'published',
+        ],
+      );
+      if (actor === 2)
+        await db.operator.query(
+          'INSERT INTO bookmarks(user_id,thought_id) SELECT $1,id FROM thoughts WHERE public_id=$2',
+          [actors[index === 21 ? 0 : 1].id, publicId],
+        );
+      if (index < 21) (actor === 0 ? own : saved).push(publicId);
+    }
+  }
+  // Row21 of the owner is a deliberate extra foreign-to-bookmark record; remove
+  // it so the independently expected own page is exactly21 eligible rows.
+  const ownRows = (
+    await db.operator.query(
+      "SELECT public_id FROM thoughts WHERE author_id=$1 AND body='Clearly fictional pagination fixture' AND status='published' AND expires_at>now()",
+      [actors[0].id],
+    )
+  ).rows;
+  for (const row of ownRows)
+    if (!own.includes(row.public_id))
+      await db.operator.query('DELETE FROM thoughts WHERE public_id=$1', [
+        row.public_id,
+      ]);
+  for (const [endpoint, actor, expected, nested] of [
+    ['/api/me/thoughts', 0, own.sort(), true],
+    ['/api/me/bookmarks', 1, saved.sort(), false],
+  ] as const) {
+    const firstResponse = await service.handle(req(endpoint, actor));
+    expect(firstResponse.headers.get('cache-control')).toBe(
+      'private, no-store',
+    );
+    const first = await firstResponse.json();
+    expect(first.items).toHaveLength(20);
+    const ids = first.items.map(
+      (item: { publicId: string; thought: { publicId: string } }) =>
+        nested ? item.thought.publicId : item.publicId,
+    );
+    expect(ids).toEqual(expected.slice(0, 20));
+    expect(first.nextCursor).toBe(expected[19]);
+    const second = await (
+      await service.handle(req(`${endpoint}?cursor=${first.nextCursor}`, actor))
+    ).json();
+    expect(second.items).toHaveLength(1);
+    expect(second.nextCursor).toBeNull();
+    ids.push(
+      nested ? second.items[0].thought.publicId : second.items[0].publicId,
+    );
+    expect(ids).toEqual(expected);
+    expect(new Set(ids).size).toBe(21);
+  }
+  // Preserve the pre-existing lifecycle cases' isolated initial fixture state.
+  await db.operator.query(
+    "DELETE FROM thoughts WHERE body='Clearly fictional pagination fixture'",
+  );
+}, 30000);

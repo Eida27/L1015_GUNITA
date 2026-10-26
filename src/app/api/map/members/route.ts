@@ -1,16 +1,20 @@
+import { observeRequest } from '@/server/security/request-log';
 import { queryMapMembers, MapInputError } from '@/server/geo/pins';
 import { getMapDatabase } from '@/server/geo/runtime';
 import { limitMapRequests } from '@/server/geo/limits';
 import { ApiError, errorResponse } from '@/lib/api/errors';
+import { mapMembersSchema } from '@/lib/map-contract';
 export const runtime = 'nodejs';
-export async function GET(request: Request) {
+async function handle(request: Request) {
   try {
     await limitMapRequests(getMapDatabase(), 'pins');
     const result = await queryMapMembers(
       getMapDatabase(),
       new URL(request.url).searchParams,
     );
-    return Response.json(result, { headers: { 'Cache-Control': 'no-store' } });
+    return Response.json(mapMembersSchema.parse(result), {
+      headers: { 'Cache-Control': 'no-store' },
+    });
   } catch (error) {
     if (error instanceof ApiError) return errorResponse(error);
     return Response.json(
@@ -27,3 +31,6 @@ export async function GET(request: Request) {
     );
   }
 }
+
+export const GET = (request: Request) =>
+  observeRequest('map', () => handle(request));

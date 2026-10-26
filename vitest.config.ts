@@ -8,6 +8,8 @@ export default defineConfig({
   test: {
     environment: 'node',
     maxWorkers: 1,
+    isolate: true,
+    experimental: { diagnostics: { isolate: false } },
     include: [
       'tests/unit/**/*.test.{ts,mjs}',
       'tests/integration/**/*.test.{ts,mjs}',

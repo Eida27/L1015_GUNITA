@@ -1,0 +1,222 @@
+[
+  {
+    "label": "en/light/warning",
+    "violations": [],
+    "incompleteRules": ["color-contrast"]
+  },
+  {
+    "label": "en/light/guest-map",
+    "violations": [],
+    "incompleteRules": ["color-contrast"]
+  },
+  {
+    "label": "en/light/thought",
+    "violations": [],
+    "incompleteRules": []
+  },
+  {
+    "label": "en/light/help",
+    "violations": [],
+    "incompleteRules": []
+  },
+  {
+    "label": "en/light/settings",
+    "violations": [],
+    "incompleteRules": []
+  },
+  {
+    "label": "en/light/dashboard/thoughts",
+    "violations": [],
+    "incompleteRules": []
+  },
+  {
+    "label": "en/light/dashboard/bookmarks",
+    "violations": [],
+    "incompleteRules": []
+  },
+  {
+    "label": "en/light/unverified",
+    "violations": [],
+    "incompleteRules": []
+  },
+  {
+    "label": "en/light/suspended",
+    "violations": [],
+    "incompleteRules": []
+  },
+  {
+    "label": "en/light/moderator",
+    "violations": [],
+    "incompleteRules": []
+  },
+  {
+    "label": "en/light/deleted-account",
+    "violations": [],
+    "incompleteRules": []
+  },
+  {
+    "label": "en/dark/warning",
+    "violations": [],
+    "incompleteRules": ["color-contrast"]
+  },
+  {
+    "label": "en/dark/guest-map",
+    "violations": [],
+    "incompleteRules": ["color-contrast"]
+  },
+  {
+    "label": "en/dark/thought",
+    "violations": [],
+    "incompleteRules": []
+  },
+  {
+    "label": "en/dark/help",
+    "violations": [],
+    "incompleteRules": []
+  },
+  {
+    "label": "en/dark/settings",
+    "violations": [],
+    "incompleteRules": []
+  },
+  {
+    "label": "en/dark/dashboard/thoughts",
+    "violations": [],
+    "incompleteRules": []
+  },
+  {
+    "label": "en/dark/dashboard/bookmarks",
+    "violations": [],
+    "incompleteRules": []
+  },
+  {
+    "label": "en/dark/unverified",
+    "violations": [],
+    "incompleteRules": []
+  },
+  {
+    "label": "en/dark/suspended",
+    "violations": [],
+    "incompleteRules": []
+  },
+  {
+    "label": "en/dark/moderator",
+    "violations": [],
+    "incompleteRules": []
+  },
+  {
+    "label": "en/dark/deleted-account",
+    "violations": [],
+    "incompleteRules": []
+  },
+  {
+    "label": "fil/light/warning",
+    "violations": [],
+    "incompleteRules": ["color-contrast"]
+  },
+  {
+    "label": "fil/light/guest-map",
+    "violations": [],
+    "incompleteRules": ["color-contrast"]
+  },
+  {
+    "label": "fil/light/thought",
+    "violations": [],
+    "incompleteRules": []
+  },
+  {
+    "label": "fil/light/help",
+    "violations": [],
+    "incompleteRules": []
+  },
+  {
+    "label": "fil/light/settings",
+    "violations": [],
+    "incompleteRules": []
+  },
+  {
+    "label": "fil/light/dashboard/thoughts",
+    "violations": [],
+    "incompleteRules": []
+  },
+  {
+    "label": "fil/light/dashboard/bookmarks",
+    "violations": [],
+    "incompleteRules": []
+  },
+  {
+    "label": "fil/light/unverified",
+    "violations": [],
+    "incompleteRules": []
+  },
+  {
+    "label": "fil/light/suspended",
+    "violations": [],
+    "incompleteRules": []
+  },
+  {
+    "label": "fil/light/moderator",
+    "violations": [],
+    "incompleteRules": []
+  },
+  {
+    "label": "fil/light/deleted-account",
+    "violations": [],
+    "incompleteRules": []
+  },
+  {
+    "label": "fil/dark/warning",
+    "violations": [],
+    "incompleteRules": ["color-contrast"]
+  },
+  {
+    "label": "fil/dark/guest-map",
+    "violations": [],
+    "incompleteRules": ["color-contrast"]
+  },
+  {
+    "label": "fil/dark/thought",
+    "violations": [],
+    "incompleteRules": []
+  },
+  {
+    "label": "fil/dark/help",
+    "violations": [],
+    "incompleteRules": []
+  },
+  {
+    "label": "fil/dark/settings",
+    "violations": [],
+    "incompleteRules": []
+  },
+  {
+    "label": "fil/dark/dashboard/thoughts",
+    "violations": [],
+    "incompleteRules": []
+  },
+  {
+    "label": "fil/dark/dashboard/bookmarks",
+    "violations": [],
+    "incompleteRules": []
+  },
+  {
+    "label": "fil/dark/unverified",
+    "violations": [],
+    "incompleteRules": []
+  },
+  {
+    "label": "fil/dark/suspended",
+    "violations": [],
+    "incompleteRules": []
+  },
+  {
+    "label": "fil/dark/moderator",
+    "violations": [],
+    "incompleteRules": []
+  },
+  {
+    "label": "fil/dark/deleted-account",
+    "violations": [],
+    "incompleteRules": []
+  }
+]

@@ -1,0 +1,154 @@
+[
+  {
+    "label": "en/light/warning",
+    "violations": [],
+    "incompleteRules": ["color-contrast"],
+    "incompleteNodes": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": ["#warning-description > p:nth-child(1)"],
+            "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it partially overlaps other elements",
+            "messages": [
+              "Element's background color could not be determined because it partially overlaps other elements"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "label": "en/light/guest-map",
+    "violations": [],
+    "incompleteRules": ["color-contrast"],
+    "incompleteNodes": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [".maplibregl-ctrl-attrib-inner"],
+            "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node",
+            "messages": [
+              "Element's background color could not be determined because element contains an image node"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "label": "en/dark/warning",
+    "violations": [],
+    "incompleteRules": ["color-contrast"],
+    "incompleteNodes": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": ["#warning-description > p:nth-child(1)"],
+            "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it partially overlaps other elements",
+            "messages": [
+              "Element's background color could not be determined because it partially overlaps other elements"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "label": "en/dark/guest-map",
+    "violations": [],
+    "incompleteRules": ["color-contrast"],
+    "incompleteNodes": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [".maplibregl-ctrl-attrib-inner"],
+            "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node",
+            "messages": [
+              "Element's background color could not be determined because element contains an image node"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "label": "fil/light/warning",
+    "violations": [],
+    "incompleteRules": ["color-contrast"],
+    "incompleteNodes": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": ["#warning-description > p:nth-child(1)"],
+            "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it partially overlaps other elements",
+            "messages": [
+              "Element's background color could not be determined because it partially overlaps other elements"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "label": "fil/light/guest-map",
+    "violations": [],
+    "incompleteRules": ["color-contrast"],
+    "incompleteNodes": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [".maplibregl-ctrl-attrib-inner"],
+            "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node",
+            "messages": [
+              "Element's background color could not be determined because element contains an image node"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "label": "fil/dark/warning",
+    "violations": [],
+    "incompleteRules": ["color-contrast"],
+    "incompleteNodes": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": ["#warning-description > p:nth-child(1)"],
+            "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it partially overlaps other elements",
+            "messages": [
+              "Element's background color could not be determined because it partially overlaps other elements"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "label": "fil/dark/guest-map",
+    "violations": [],
+    "incompleteRules": ["color-contrast"],
+    "incompleteNodes": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [".maplibregl-ctrl-attrib-inner"],
+            "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because element contains an image node",
+            "messages": [
+              "Element's background color could not be determined because element contains an image node"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]

@@ -269,5 +269,12 @@
   "Subject": "Subject",
   "Account reference": "Account reference",
   "Reported and suspended accounts.": "Reported and suspended accounts.",
-  "Unavailable": "Unavailable"
+  "Unavailable": "Unavailable",
+  "Grant administrator access": "Grant administrator access",
+  "Inspect record": "Inspect record",
+  "Operator confirmed": "Operator confirmed",
+  "Member": "Member",
+  "Thought": "Thought",
+  "Account": "Account",
+  "Report": "Report"
 }

@@ -20,6 +20,11 @@ export type AuthOptions = {
   turnstile?: TurnstileConfig;
 };
 const emailInput = z.string().trim().toLowerCase().max(254).pipe(z.email());
+const accountOutput = z.strictObject({
+  email: z.email().max(254),
+  emailVerified: z.boolean(),
+  pseudonym: z.string().min(1).max(100),
+});
 const passwordInput = z.string().min(12).max(128);
 const signup = z.object({
   email: emailInput,
@@ -167,11 +172,11 @@ export function createAuthService(options: AuthOptions) {
           const actor = await requireVerifiedMember(context, headers);
           if (request.method === 'GET')
             return Response.json(
-              {
+              accountOutput.parse({
                 email: actor.email,
                 emailVerified: actor.emailVerified,
                 pseudonym: actor.pseudonym,
-              },
+              }),
               { headers: { 'Cache-Control': 'private, no-store' } },
             );
           const credential = (

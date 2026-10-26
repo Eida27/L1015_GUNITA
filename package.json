@@ -9,6 +9,10 @@
     "pnpm": "11.25.0"
   },
   "scripts": {
+    "backup:create": "node scripts/backup.mjs create",
+    "backup:keygen": "node scripts/backup.mjs keygen",
+    "backup:restore": "node scripts/backup.mjs restore",
+    "backup:verify": "vitest run tests/integration/backup.test.ts",
     "admin:bootstrap": "node scripts/admin-bootstrap.mjs",
     "setup": "node scripts/setup.mjs",
     "local": "node scripts/local.mjs",
@@ -22,6 +26,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "test:e2e:standalone": "node tests/fixtures/standalone-suite.mjs",
     "services:up": "docker compose up -d --wait db mailpit",
     "services:down": "docker compose down",
     "db:prepare": "node scripts/db.mjs prepare",
@@ -45,6 +50,7 @@
     "zod": "4.6.7"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
     "@playwright/test": "1.64.1",
     "@types/geojson": "7946.0.16",
     "@types/node": "24.19.2",

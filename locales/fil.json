@@ -269,5 +269,12 @@
   "Subject": "Paksa",
   "Account reference": "Sanggunian ng account",
   "Reported and suspended accounts.": "Mga account na naiulat o nasuspinde.",
-  "Unavailable": "Hindi available"
+  "Unavailable": "Hindi available",
+  "Grant administrator access": "Magbigay ng pahintulot bilang tagapangasiwa",
+  "Inspect record": "Suriin ang tala",
+  "Operator confirmed": "Kinumpirma ng operator",
+  "Member": "Miyembro",
+  "Thought": "Saloobin",
+  "Account": "Account",
+  "Report": "Ulat"
 }

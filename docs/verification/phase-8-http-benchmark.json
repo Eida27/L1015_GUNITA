@@ -1,0 +1,54 @@
+{
+  "kind": "standalone-loopback-http",
+  "startup": {
+    "coldReadyMs": 4714.349900000001,
+    "coldFirstMapMs": 308.1219999999994,
+    "seeded": {
+      "thoughts": 10500,
+      "areas": 87,
+      "tiers": [7, 6, 5]
+    }
+  },
+  "samples": [
+    {
+      "label": "world",
+      "features": 3,
+      "total": 10560,
+      "bytes": 495,
+      "samples": 30,
+      "p50Ms": 412.44810000000143,
+      "p95Ms": 739.9289999999964,
+      "targetMet": true
+    },
+    {
+      "label": "philippines",
+      "features": 69,
+      "total": 10560,
+      "bytes": 10209,
+      "samples": 30,
+      "p50Ms": 226.17700000000332,
+      "p95Ms": 493.6186000000016,
+      "targetMet": true
+    },
+    {
+      "label": "metro",
+      "features": 6,
+      "total": 541,
+      "bytes": 932,
+      "samples": 30,
+      "p50Ms": 107.8214999999982,
+      "p95Ms": 188.1201000000001,
+      "targetMet": true
+    },
+    {
+      "label": "emotion",
+      "features": 26,
+      "total": 3530,
+      "bytes": 3925,
+      "samples": 30,
+      "p50Ms": 157.20939999999973,
+      "p95Ms": 342.4244000000035,
+      "targetMet": true
+    }
+  ]
+}

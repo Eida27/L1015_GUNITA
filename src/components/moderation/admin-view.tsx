@@ -19,6 +19,7 @@ import {
 import { mutationReceiptSchema } from '@/lib/thought-contract';
 import { errorKey, type MessageKey } from '@/lib/i18n/catalog';
 import { reasonLabels } from './report-form';
+import { AuditEntry } from './audit-entry';
 const reasonText = {
   HARASSMENT: 'Harassment',
   PRIVATE_INFO: 'Private information',
@@ -254,7 +255,7 @@ function AdminContent({
   kind: 'reports' | 'accounts' | 'audit';
   signal: AbortSignal;
 }) {
-  const { t, store } = usePreferences();
+  const { t, store, locale } = usePreferences();
   const [reports, setReports] = useState<z.infer<
       typeof reportsResponseSchema
     > | null>(null),
@@ -399,17 +400,7 @@ function AdminContent({
       {audits ? (
         <ul>
           {audits.items.map((item) => (
-            <li key={item.id}>
-              {item.action} · {item.reasonCode} · {item.changedStatus ?? '—'} ·{' '}
-              {item.createdAt}
-              <p>
-                {t('Subject')}: {item.subjectReference ?? t('Unavailable')} ·{' '}
-                {item.subjectKind}
-              </p>
-              <p>
-                {t('Administrator')}: {item.actorId ?? t('Unavailable')}
-              </p>
-            </li>
+            <AuditEntry key={item.id} item={item} locale={locale} />
           ))}
         </ul>
       ) : null}

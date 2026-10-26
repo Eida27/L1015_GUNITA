@@ -332,11 +332,11 @@ test('account console can unsuspend after the last reported thought is deleted a
   await page
     .getByRole('link', { name: 'Moderation history', exact: true })
     .click();
-  const audit = page.locator('li').filter({ hasText: 'unsuspend' });
+  const audit = page.locator('li').filter({ hasText: 'Unsuspend account' });
   await expect(audit).toContainText('Administrator:');
   await expect(audit).toContainText('Subject:');
   await expect(audit).toContainText(/[0-9a-f]{8}-[0-9a-f-]{27}/);
-  const deleted = page.locator('li').filter({ hasText: 'delete_thought' });
+  const deleted = page.locator('li').filter({ hasText: 'Delete thought' });
   await expect(deleted).toContainText('Subject: Unavailable');
   await expect(
     page.getByText('Clearly fictional moderation review fixture.', {

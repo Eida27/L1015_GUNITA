@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import pg from 'pg';
+import { smtpSender } from '../../src/server/auth/email';
 import { randomBytes, createHmac } from 'node:crypto';
 import { loadLocalEnv } from '../../scripts/load-env.mjs';
 import { loadDatabaseEnv } from '../../scripts/database-env.mjs';
@@ -30,18 +31,41 @@ let cookie = '',
 let admin: pg.Client, db: pg.Client, pool: pg.Pool;
 let service: ReturnType<typeof createAuthService>;
 const observedLogs: string[] = [];
+// Optional content-free timings for real integration boundaries; no auth/SMTP
+// operation or assertion is replaced. Useful when diagnosing a suite timeout.
+async function measure<T>(
+  operation: string,
+  work: () => Promise<T>,
+): Promise<T> {
+  const started = performance.now();
+  try {
+    return await work();
+  } finally {
+    if (process.env.GUNITA_AUTH_TIMING === 'true')
+      process.stderr.write(
+        JSON.stringify({
+          operation,
+          ms: Math.round(performance.now() - started),
+        }) + '\n',
+      );
+  }
+}
 async function post(path: string, body: unknown, cookie = '') {
-  return service.handle(
-    new Request(`${origin}${path}`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', origin, cookie },
-      body: JSON.stringify(body),
-    }),
+  return measure(path, () =>
+    service.handle(
+      new Request(`${origin}${path}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin, cookie },
+        body: JSON.stringify(body),
+      }),
+    ),
   );
 }
 async function mail(kind: 'verify' | 'reset', address = email) {
   const list = await (
-    await fetch('http://127.0.0.1:8028/api/v1/messages')
+    await fetch('http://127.0.0.1:8028/api/v1/messages', {
+      signal: AbortSignal.timeout(3000),
+    })
   ).json();
   const item = list.messages.find(
     (m: { To: { Address: string }[]; Subject: string }) =>
@@ -50,7 +74,9 @@ async function mail(kind: 'verify' | 'reset', address = email) {
   );
   expect(item).toBeTruthy();
   const message = await (
-    await fetch(`http://127.0.0.1:8028/api/v1/message/${item.ID}`)
+    await fetch(`http://127.0.0.1:8028/api/v1/message/${item.ID}`, {
+      signal: AbortSignal.timeout(3000),
+    })
   ).json();
   expect(message.Text).not.toContain(password);
   const link = message.Text.match(/http:\/\/127\.0\.0\.1:3000\/[^\s]+/)[0];
@@ -251,11 +277,16 @@ describe('real Better Auth and Mailpit account lifecycle', () => {
     url.username = runtimeRole;
     url.password = rolePassword;
     pool = new pg.Pool({ connectionString: url.toString(), max: 2 });
+    const smtp = smtpSender(origin, 1028);
     service = createAuthService({
       pool,
       origin,
       secret: authSecret,
       smtpPort: 1028,
+      sendEmail: {
+        check: () => measure('smtp-check', () => smtp.check()),
+        send: (mail) => measure('smtp-send', () => smtp.send(mail)),
+      },
     });
   }, 60000);
   afterAll(async () => {
@@ -489,7 +520,7 @@ describe('real Better Auth and Mailpit account lifecycle', () => {
     expect(unknown.status).toBe(200);
     expect(await known.json()).toEqual({ status: true });
     expect(await unknown.json()).toEqual({ status: true });
-  });
+  }, 15000);
   it('reset revalidates status, atomically consumes the token and revokes every session', async () => {
     expect(
       (await post('/api/auth/request-password-reset', { email })).status,
@@ -541,7 +572,7 @@ describe('real Better Auth and Mailpit account lifecycle', () => {
         password: password + 'new',
       }),
     );
-  });
+  }, 15000);
   it('rolls token consumption, session revocation and password update back together on database failure', async () => {
     await post('/api/auth/request-password-reset', { email });
     const token = await mail('reset');
@@ -594,7 +625,7 @@ describe('real Better Auth and Mailpit account lifecycle', () => {
       await db.query('DROP TRIGGER IF EXISTS fail_auth_test_update ON account');
       await db.query('DROP FUNCTION IF EXISTS fail_auth_test_update()');
     }
-  });
+  }, 15000);
   it('rejects expired resets and logs out through library cookies/session revocation', async () => {
     await post('/api/auth/request-password-reset', { email });
     const token = await mail('reset');
@@ -624,7 +655,7 @@ describe('real Better Auth and Mailpit account lifecycle', () => {
         password: password + 'new',
       }),
     );
-  });
+  }, 15000);
   it('requires password reauthentication for deletion and cascades all sessions', async () => {
     const remove = (body: unknown) =>
       service.handle(
@@ -702,7 +733,7 @@ describe('real Better Auth and Mailpit account lifecycle', () => {
         })
       ).status,
     ).toBe(400);
-  });
+  }, 15000);
   it('gives the same SMTP-down state for known, duplicate and unknown recipients', async () => {
     const bad = createAuthService({
       pool,
@@ -840,7 +871,7 @@ describe('real Better Auth and Mailpit account lifecycle', () => {
     } finally {
       await db.query(original);
     }
-  });
+  }, 15000);
   it('durably throttles wrong credentials across service instances and ignores spoofed forwarding', async () => {
     const address = `limit-${suffix}@test.invalid`;
     const observed = new Map<string, { count: number; window_start: Date }>();
