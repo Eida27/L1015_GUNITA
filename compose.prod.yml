@@ -1,0 +1,217 @@
+name: gunita-production
+
+x-common: &common
+  restart: unless-stopped
+  init: true
+  security_opt: [no-new-privileges:true]
+  logging:
+    driver: journald
+    options: { tag: 'gunita/{{.Name}}' }
+
+x-operator: &operator
+  <<: *common
+  image: ${GUNITA_OPERATOR_IMAGE:-gunita-operator:local}
+  build: { context: ., target: operator }
+  read_only: true
+  tmpfs: ['/tmp:size=64m,mode=1777']
+  networks: [database]
+  mem_limit: 512m
+  cpus: 0.5
+  cap_drop: [ALL]
+  stop_grace_period: 150s
+  depends_on:
+    db: { condition: service_healthy }
+
+services:
+  db:
+    <<: *common
+    image: postgis/postgis:17-3.6@sha256:d7053f57b0d62c427ffbf412208b6625317124d62eebf40672e990fea81e9d53
+    command:
+      [
+        'postgres',
+        '-c',
+        'log_statement=none',
+        '-c',
+        'log_min_error_statement=panic',
+        '-c',
+        'log_parameter_max_length=0',
+        '-c',
+        'log_parameter_max_length_on_error=0',
+        '-c',
+        'log_min_messages=fatal',
+        '-c',
+        'log_duration=off',
+        '-c',
+        'log_min_duration_statement=-1',
+      ]
+    environment:
+      POSTGRES_USER: gunita
+      POSTGRES_DB: gunita
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets: [postgres_password]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    networks: [database]
+    mem_limit: 768m
+    cpus: 1
+    healthcheck:
+      test: ['CMD', 'pg_isready', '-U', 'gunita', '-d', 'gunita']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    stop_grace_period: 60s
+  web:
+    <<: *common
+    image: ${GUNITA_WEB_IMAGE:-gunita-web:local}
+    build: { context: ., target: web }
+    environment:
+      APP_ORIGIN: ${APP_ORIGIN:?Set canonical HTTPS origin}
+      PORT: '3000'
+      TRUST_PROXY: direct
+      NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:?Set public site key}
+      SMTP_HOST: ${SMTP_HOST:?Set SMTP host}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_FROM: ${SMTP_FROM:?Set verified sender}
+      MAP_STYLE_URL: ${MAP_STYLE_URL:?Set licensed HTTPS style}
+      MAP_RESOURCE_ORIGINS: ${MAP_RESOURCE_ORIGINS:-}
+    secrets: [web_env]
+    networks: [database, edge, outbound]
+    read_only: true
+    tmpfs: ['/tmp:size=64m,mode=1777']
+    cap_drop: [ALL]
+    mem_limit: 512m
+    cpus: 1
+    stop_grace_period: 30s
+    depends_on:
+      db: { condition: service_healthy }
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/api/ready',{signal:AbortSignal.timeout(4000)}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+  caddy:
+    <<: *common
+    image: caddy:2.11.7-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f
+    environment:
+      APP_HOST: ${APP_HOST:?Set hostname}
+    ports:
+      - '${CADDY_BIND:-127.0.0.1}:${HTTP_PORT:-80}:80'
+      - '${CADDY_BIND:-127.0.0.1}:${HTTPS_PORT:-443}:443'
+    volumes:
+      - ./infra/Caddyfile.prod:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks: [edge, outbound]
+    mem_limit: 128m
+    cpus: 0.5
+    depends_on:
+      web: { condition: service_healthy }
+    healthcheck:
+      test:
+        ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:8080/health']
+      interval: 20s
+      timeout: 5s
+      retries: 3
+  maintenance:
+    <<: *operator
+    command: [maintenance]
+    secrets: [maintenance_env]
+    volumes: [operations-state:/state]
+    healthcheck:
+      test: ['CMD', 'node', 'scripts/job-health.mjs', 'maintenance']
+      interval: 60s
+      timeout: 5s
+      retries: 2
+      start_period: 120s
+  backup:
+    <<: *operator
+    command: [backup]
+    secrets: [backup_env]
+    environment: &backup-env
+      BACKUP_DESTINATION: /archives
+      BACKUP_DESTINATION_KIND: offsite-mounted
+      BACKUP_KEY_FILE: /keys/backup.key
+      BACKUP_RETENTION_DAYS: '7'
+    volumes:
+      - operations-state:/state
+      - backup-keys:/keys:ro
+      - type: bind
+        source: ${BACKUP_ARCHIVE_PATH:?Set verified offsite mount}
+        target: /archives
+        bind: { create_host_path: false }
+    healthcheck:
+      test: ['CMD', 'node', 'scripts/job-health.mjs', 'backup']
+      interval: 60s
+      timeout: 5s
+      retries: 2
+      start_period: 180s
+  metrics:
+    <<: *operator
+    command: [metrics]
+    secrets: [metrics_env]
+    networks: [database, edge]
+    volumes:
+      - operations-state:/state
+      - type: bind
+        source: ${BACKUP_ARCHIVE_PATH:?Set verified offsite mount}
+        target: /archives
+        read_only: true
+        bind: { create_host_path: false }
+    healthcheck:
+      test: ['CMD', 'node', 'scripts/job-health.mjs', 'metrics']
+      interval: 60s
+      timeout: 5s
+      retries: 2
+      start_period: 120s
+  operator:
+    <<: *operator
+    profiles: [ops]
+    restart: 'no'
+    command: [migrate]
+    secrets: [operator_env]
+    environment:
+      <<: *backup-env
+      RESTORE_RUNTIME_ROLE: gunita_app
+    volumes:
+      - backup-keys:/keys
+      - type: bind
+        source: ${BACKUP_ARCHIVE_PATH:?Set verified offsite mount}
+        target: /archives
+        bind: { create_host_path: false }
+  volume-init:
+    <<: *operator
+    profiles: [ops]
+    restart: 'no'
+    user: '0:0'
+    cap_add: [CHOWN, FOWNER, DAC_OVERRIDE]
+    entrypoint: [sh, '-c']
+    command: ['chown 10001:10001 /state /keys && chmod 700 /state /keys']
+    volumes: [operations-state:/state, backup-keys:/keys]
+
+networks:
+  database: { internal: true }
+  edge: { internal: true }
+  outbound: {}
+volumes:
+  pgdata: {}
+  caddy-data: {}
+  caddy-config: {}
+  operations-state: {}
+  backup-keys: {}
+secrets:
+  postgres_password:
+    {
+      file: '${GUNITA_SECRETS_DIR:?Set external private directory}/postgres_password',
+    }
+  web_env: { file: '${GUNITA_SECRETS_DIR}/web.env' }
+  maintenance_env: { file: '${GUNITA_SECRETS_DIR}/maintenance.env' }
+  backup_env: { file: '${GUNITA_SECRETS_DIR}/backup.env' }
+  metrics_env: { file: '${GUNITA_SECRETS_DIR}/metrics.env' }
+  operator_env: { file: '${GUNITA_SECRETS_DIR}/operator.env' }

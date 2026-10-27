@@ -3,6 +3,13 @@ export function validateEnv(input, mode = 'development') {
   const invalid = new Set();
   const preview = mode === 'production' && input.LOCAL_PREVIEW === 'true';
   const production = mode === 'production' && !preview;
+  if (
+    input.CONTAINER_PREVIEW !== undefined &&
+    (input.CONTAINER_PREVIEW !== 'true' ||
+      !preview ||
+      input.LOCAL_PROXY !== 'true')
+  )
+    invalid.add('CONTAINER_PREVIEW');
   let url;
   try {
     url = new URL(
@@ -113,5 +120,12 @@ export function validateEnv(input, mode = 'development') {
     invalid.add('TRUST_PROXY');
   if (invalid.size)
     throw new Error(`Invalid environment: ${[...invalid].sort().join(', ')}`);
-  return { origin: url.origin, port, preview, databaseUrl: input.DATABASE_URL };
+  return {
+    origin: url.origin,
+    port,
+    preview,
+    databaseUrl: input.DATABASE_URL,
+    hostname:
+      preview && input.CONTAINER_PREVIEW !== 'true' ? '127.0.0.1' : '0.0.0.0',
+  };
 }

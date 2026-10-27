@@ -1,0 +1,19 @@
+{
+    admin off
+    # Avoid proxy error payloads containing URI, IP or headers. Access logs are off.
+    log {
+        output discard
+    }
+}
+{$APP_HOST} {
+    encode zstd gzip
+    reverse_proxy web:3000 {
+        header_up -CF-Connecting-IP
+        header_up -True-Client-IP
+        header_up -Forwarded
+        header_up X-Forwarded-For ""
+    }
+}
+http://:8080 {
+    respond /health "ok" 200
+}

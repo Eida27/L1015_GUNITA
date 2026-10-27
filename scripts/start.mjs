@@ -8,7 +8,7 @@ try {
   const config = validateEnv(process.env, 'production');
   process.env.NODE_ENV = 'production';
   process.env.NEXT_TELEMETRY_DISABLED = '1';
-  process.env.HOSTNAME = config.preview ? '127.0.0.1' : '0.0.0.0';
+  process.env.HOSTNAME = config.hostname;
   process.env.PORT = String(config.port);
   await import(pathToFileURL(resolve('.next/standalone/server.js')).href);
 } catch (error) {

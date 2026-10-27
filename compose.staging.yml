@@ -1,0 +1,60 @@
+# Explicit local-only override. Use scripts/rehearse.mjs to create isolated dummy settings.
+x-staging-logging: &staging-logging
+  driver: local
+  options: !override { max-size: '5m', max-file: '3' }
+services:
+  db:
+    logging: *staging-logging
+  maintenance:
+    logging: *staging-logging
+  web:
+    logging: *staging-logging
+    environment:
+      LOCAL_PREVIEW: 'true'
+      LOCAL_PROXY: 'true'
+      CONTAINER_PREVIEW: 'true'
+  caddy:
+    logging: *staging-logging
+    ports: !override
+      - '127.0.0.1:${HTTPS_PORT:-8449}:443'
+    volumes: !override
+      - ./infra/Caddyfile.staging:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+  mailpit:
+    logging: *staging-logging
+    image: axllent/mailpit@sha256:23fe39e81bde596a918000b3135c0f85dc8bb4c9ea6be274b051143f3e300387
+    networks: [outbound]
+    mem_limit: 64m
+    restart: unless-stopped
+  backup:
+    logging: *staging-logging
+    environment: { BACKUP_DESTINATION_KIND: local-simulation }
+    volumes:
+      !override [
+        operations-state:/state,
+        backup-keys:/keys:ro,
+        rehearsal-archives:/archives,
+      ]
+  metrics:
+    logging: *staging-logging
+    volumes:
+      !override [operations-state:/state, rehearsal-archives:/archives:ro]
+  operator:
+    logging: *staging-logging
+    environment: { BACKUP_DESTINATION_KIND: local-simulation }
+    volumes: !override [backup-keys:/keys, rehearsal-archives:/archives]
+  volume-init:
+    logging: *staging-logging
+    command:
+      [
+        'chown 10001:10001 /state /keys /archives && chmod 700 /state /keys /archives',
+      ]
+    volumes:
+      !override [
+        operations-state:/state,
+        backup-keys:/keys,
+        rehearsal-archives:/archives,
+      ]
+volumes:
+  rehearsal-archives: {}
