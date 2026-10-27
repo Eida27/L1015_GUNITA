@@ -1,6 +1,6 @@
 # Phase8 quality evidence
 
-Status: implemented; fresh review and final manual Browser acceptance pending. Local-only; actual offsite credentials and deployment remain blocked. The final inspection-label correction is awaiting its rebuilt artifact and affected history check; earlier artifact results below are preserved explicitly.
+Status: implemented; review fix P8-I01 is awaiting scoped re-review and final manual Browser acceptance belongs to the controller. Local-only; actual offsite credentials and deployment remain blocked. The final inspection-label artifact passed the affected history check; earlier artifact results below are preserved explicitly.
 
 HSTS trust handoff: headers use validated server `APP_ORIGIN`, not client `Forwarded`/`X-Forwarded-Proto`. An HTTPS production origin behind the later TLS-terminating proxy receives HSTS even when the internal Next listener uses HTTP. Local HTTP preview does not. Phase9 must configure and validate that topology; this phase adds no general forwarded-header trust framework.
 
@@ -45,7 +45,7 @@ Actual warmed standalone HTTP and cold readiness/first request are measured sepa
 
 ## Open gates
 
-Controller fresh review, remaining actual Browser/device acceptance and final history-label artifact check remain pending. Earlier phases are not restarted; Phase7's final-source build/manual gate carries here. Browser access worked for partial guest checks, then returned disabled after a session pause; no manual pass is inferred from automation.
+Controller scoped re-review and remaining actual Browser/device acceptance remain pending. Earlier phases are not restarted; Phase7's final-source build/manual gate carries here. Browser access worked for partial guest checks, returned disabled after a session pause, and recovered on October27; no manual pass is inferred from automation.
 
 ## Consolidated results and exact coverage
 
@@ -92,3 +92,15 @@ Existing origin rate guard is `src/server/geo/limits.ts`: durable atomic shared 
 A source review is not a penetration-test certification. Dependency/advisory, generated-artifact and final runtime checks are recorded with their actual results below when complete.
 
 Final source lint: identical full-tree ESLint rules/arguments with direct file descriptors completed **exit0**, no warnings/errors. PowerShell redirected attempt stalled and was stopped only after verifying its owned PID; it is not counted as a pass. Staged47files private-path/secret scan and `git diff --cached --check` passed. Current full-source build and scoped history result follow after the label change; prior results above remain attributed to their actual source state.
+
+## Review fix P8-I01 and recovered label artifact
+
+Review baseline `e1ec3f8` had one important backup configuration finding. External CLI paths now resolve their nearest existing ancestor through `realpath`, reject checkout equality/descendants, and compare path segments with Windows case handling. Separate-key containment uses the same segment comparison, so `..backup.key` cannot bypass it. Existing ownership, private ACL, authenticated import and quarantine behavior remain intact.
+
+`pnpm test tests/unit/backup-paths.test.mjs --reporter=verbose`: **RED 2 failed, 12.12s, exit1**. The inside-directory two-dot key reached ACL validation instead of containment rejection; canonical validation was missing. After repair, `pnpm test tests/unit/backup-paths.test.mjs tests/unit/backup.test.mjs tests/integration/backup.test.ts --reporter=verbose`: **5/5 across 3 files, 74.18s, exit0**. This Windows run exercised actual case variants and a directory junction with missing descendants, accepted a legitimate external two-dot directory, and retained real dump/restore and partial-write regressions. No full-suite rerun or app rebuild was needed for this operator-only repair.
+
+The label build log completed compilation (2.5min), TypeScript (98s), page generation and route/proxy output on October26. Its terminal session was unavailable after the October27 resume, so the original shell exit code is **not recoverable and is not asserted as zero**. The existing fresh artifact was retained; `node scripts/prepare-standalone.mjs` was rerun successfully with **exit0**. The final label test-file lint also passed **exit0**. Subsequent standalone history and artifact receipts are appended below.
+
+`GUNITA_STANDALONE_TEST=disposable-only pnpm test:e2e:standalone tests/e2e/moderation.spec.ts:284 --max-failures=1`: **1/1, 1.1min, exit0** on the recovered final-label artifact. The scenario checks `Inspect record` and `Suriin ang tala` while retaining unavailable subject references. Its disposable runtime/database cleanup completed. The earlier 46-case distributed coverage remains attributed to the pre-label artifact; only this affected scenario was rerun.
+
+Final artifact audit: **2075 files, zero private environment files or runtime/operator credential matches**, settings preserved and runtime role still least privilege; separate **2069-file** fixture/artifact/log scan had **zero private values, raw-coordinate canaries or environment files**. Both commands exited0. The retained manual preview was restored on the existing database with original body and lifetime fields verified unchanged. Actual Browser access returned to the controller on October27; remaining manual acceptance is reported separately by the controller, not inferred from these automated results.

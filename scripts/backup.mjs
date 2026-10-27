@@ -1,4 +1,4 @@
-import { resolve, isAbsolute } from 'node:path';
+import { externalBackupPath } from './backup-paths.mjs';
 import { loadLocalEnv } from './load-env.mjs';
 import {
   backupDatabase,
@@ -8,28 +8,14 @@ import {
 loadLocalEnv();
 const command = process.argv[2];
 try {
-  const keyFile = process.env.BACKUP_KEY_FILE;
-  if (
-    !keyFile ||
-    !isAbsolute(keyFile) ||
-    resolve(keyFile).startsWith(
-      resolve('.') + (process.platform === 'win32' ? '\\' : '/'),
-    )
-  )
-    throw new Error('External key file required');
+  const keyFile = await externalBackupPath(process.env.BACKUP_KEY_FILE);
   if (command === 'keygen') {
     await createBackupKey(keyFile);
     console.log(JSON.stringify({ event: 'backup_key_created' }));
   } else if (command === 'create') {
-    const destination = process.env.BACKUP_DESTINATION;
-    if (
-      !destination ||
-      !isAbsolute(destination) ||
-      resolve(destination).startsWith(
-        resolve('.') + (process.platform === 'win32' ? '\\' : '/'),
-      )
-    )
-      throw new Error('External backup destination required');
+    const destination = await externalBackupPath(
+      process.env.BACKUP_DESTINATION,
+    );
     const result = await backupDatabase({
       databaseUrl: process.env.BACKUP_DATABASE_URL,
       destination,

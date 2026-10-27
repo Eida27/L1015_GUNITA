@@ -10,7 +10,8 @@ import {
   mkdir,
   open,
 } from 'node:fs/promises';
-import { join, relative, isAbsolute } from 'node:path';
+import { join } from 'node:path';
+import { withinBackupPath } from './backup-paths.mjs';
 import pg from 'pg';
 import { migrate } from '../src/server/db/migrate.mjs';
 import { runMaintenance } from '../src/server/db/maintenance.mjs';
@@ -205,8 +206,7 @@ export async function backupDatabase({
   await mkdir(destination, { recursive: true, mode: 0o700 });
   const directory = await realpath(destination),
     keyPath = await realpath(keyFile);
-  const keyRelative = relative(directory, keyPath);
-  if (!keyRelative.startsWith('..') && !isAbsolute(keyRelative))
+  if (withinBackupPath(directory, keyPath))
     throw new Error('Backup key must be separate from archives');
   const key = await loadKey(keyPath);
   let plain;

@@ -339,8 +339,17 @@ test('account console can unsuspend after the last reported thought is deleted a
   const deleted = page.locator('li').filter({ hasText: 'Delete thought' });
   await expect(deleted).toContainText('Subject: Unavailable');
   await expect(
+    page.locator('li').filter({ hasText: 'Inspect record' }).first(),
+  ).toBeVisible();
+  await expect(
     page.getByText('Clearly fictional moderation review fixture.', {
       exact: true,
     }),
   ).toHaveCount(0);
+  await page
+    .getByRole('combobox', { name: 'Language', exact: true })
+    .selectOption('fil');
+  await expect(
+    page.locator('li').filter({ hasText: 'Suriin ang tala' }).first(),
+  ).toBeVisible();
 });

@@ -11,6 +11,8 @@ Use Node24.19 and PostgreSQL17 client tools matching the database. `BACKUP_PG_CO
 
 The bounded implementation accepts at most128MiB of plaintext dump; each database tool invocation has a120second deadline. Larger deployments need a separately reviewed bounded staging solution. Do not remove these limits to silence an error. Only one backup/restore worker should run at a time on the documented low-memory test host.
 
+CLI paths are resolved through existing parent directories before use, including Windows case aliases and junctions. The checkout root itself and every descendant are rejected. The key must also be outside the resolved archive directory: a filename such as `..backup.key` is still inside that directory. Missing final directories are checked through their nearest existing ancestor; inaccessible paths and broken links fail closed. Keep these operator-controlled directories protected from concurrent path replacement.
+
 ## Restore stays closed to application traffic
 
 Set `BACKUP_ARCHIVE`, the separate `BACKUP_KEY_FILE`, `RESTORE_OPERATOR_DATABASE_URL` to an isolated PostgreSQL operator connection with database creation rights, and `RESTORE_RUNTIME_ROLE` to the known application role. Then run `pnpm backup:restore`.
