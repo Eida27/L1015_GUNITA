@@ -76,3 +76,26 @@ The fallback built the cached `dependencies` target as `gunita-checks:phase9` (e
 The actual Docker production build already completed TypeScript checking; no TypeScript source changed afterward. `git diff --check` passed. Self-review covered startup/secret isolation, topology, least privilege, key/archive ownership, restore quarantine/reconciliation, job termination/failure health, sanitized metrics, meaningful tests, and production launch limitations. No unresolved implementation failure was found in this self-review; independent controller review remains separate.
 
 Raw private receipts are retained under `.local/phase-9-*` and are intentionally uncommitted. The task report records the local commit. Runbooks: [deployment](../operations/deployment.md), [launch checklist](../operations/launch-checklist.md), [backup quarantine](../operations/backups.md).
+
+## Review fixes and runtime restoration — 2026-10-28
+
+Review of `9d808d6951f14421fce65f723ed4a987909a012c` found two important defects: the documented manual backup could overlap the scheduled worker, and the rehearsal could suppress an owned-user cleanup failure. P9-I01 now requires stop/drain → one-off backup → resume, including resumption after failure. The failure harness uses that sequence and checks state from a separate read-only health command while the worker is stopped. The verification probe also drains the scheduled worker before its own backup and resumes it in `finally`. No new backup framework or database grant was introduced.
+
+P9-I02 now deletes only its owned user, verifies absence, attempts cleanup of only its validated restore database, and closes all three connections even if an earlier cleanup step fails. Any failure emits only `rehearsal_cleanup_failed` and sets exit1. The host sends the self-contained cleanup fixture alongside the existing stdin probe; an unsuccessful operator process rejects before a new verified receipt can be written. The historical successful rehearsal receipt is unchanged.
+
+Focused commands used bundled host Node24.22.1, Vitest5.0.5, one worker and1536MiB heap:
+
+```text
+node node_modules/vitest/vitest.mjs run tests/unit/operations.test.mjs tests/unit/rehearsal-cleanup.test.mjs --maxWorkers=1
+RED (old behavior extracted into fixture helpers): 2 files failed; 4 failed | 4 passed (8), 4.78s, exit1
+GREEN: 2 files passed; 8 passed (8), 2.49s, exit0
+Final GREEN after adding health-order/restore-failure coverage: 2 files passed; 10 passed (10), 2.82s, exit0
+```
+
+The earlier initial RED attempt failed to import the not-yet-created helpers (2 failed suites/no tests,6.83s); it is retained separately and is not the behavioral RED proof. The meaningful RED demonstrated two concurrent workers, exit0 after failed deletion or a still-present fixture, and failure to close remaining clients after an earlier close error. The final checks run the real awaited scheduler and atomic state writer, inject failures at the Compose/SQL transport boundaries, and execute cleanup in Node subprocesses to assert actual exit status and redacted stderr. No prose-regex assertions are used.
+
+`node .local/phase-9-fix1-operator-check.mjs` exited0: the exact assembled stdin module parses, and the existing operator image executed the cleanup helper's real SQL against a fresh nonexistent owned UUID, verified absence and closed clients. It created no fixture and did not rerun backup/restore/full rehearsal. Scoped Linux ESLint passed with exit0/no warnings or errors for the seven changed JS modules using the existing pinned `gunita-checks:phase9` image, unchanged configuration, read-only source mounts, network disabled and no secret mounts. No Next build, prior suite, image audit or historical operational gate was repeated. Raw RED/GREEN/operator/lint receipts are `.local/phase-9-fix1-*`.
+
+Self-review checked one-worker ownership on both one-off entry paths, drain before shared-state access, resumption after failure, generic cleanup status, exact owned-ID predicates, restore-name validation, closure of every client, and stdin helper assembly. The affected files are the deployment runbook, host rehearsal runner, two existing probe fixtures, two new fixture helpers, operations tests, cleanup tests and this evidence record. Application/schema/launcher/credential contracts remain unchanged. Fresh controller re-review is still required.
+
+After the app pause, the previous native listeners/PIDs and Docker backend were absent. Normal Docker Desktop startup restored the same main database `bef039778816` and Mailpit `8aff39410feb`, preserving volumes. Validated native launchers restored3000 (PID13772/session1572), retained3001 (supervisor12608/app12448/session47346) and maintenance (PID14960/session60567, first cleanup all0). Both readiness endpoints returned200. Read-only checks matched the original manual thought body, creation/expiry and published status. All seven existing `gunita-rehearsal-a817917e` containers became healthy after their normal retry interval. Private ownership receipt: `.local/phase-9-native-runtime.json`. No public deployment, host trust/journal change, credential change or unknown-database operation occurred. Production launch prerequisites above remain open.

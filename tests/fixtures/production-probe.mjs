@@ -199,14 +199,12 @@ try {
   );
   process.exitCode = 1;
 } finally {
-  await client
-    .query('DELETE FROM "user" WHERE id=$1', [author])
-    .catch(() => {});
-  if (restore) {
-    assert.match(restore.name, /^gunita_restore_[a-f0-9]{16}$/);
-    await bootstrap.query(`DROP DATABASE "${restore.name}" WITH (FORCE)`);
-  }
-  await runtime.end();
-  await client.end();
-  await bootstrap.end();
+  // Supplied alongside this stdin module by scripts/rehearse.mjs.
+  await globalThis.cleanupProductionProbe({
+    client,
+    bootstrap,
+    runtime,
+    author,
+    restore,
+  });
 }

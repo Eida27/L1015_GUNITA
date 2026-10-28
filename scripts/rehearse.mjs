@@ -161,20 +161,30 @@ try {
           'scripts/job-health.mjs',
           name,
         ]);
-      await docker(
-        [
-          'run',
-          '--rm',
-          '-T',
-          '--no-deps',
-          '--entrypoint',
-          'node',
-          'operator',
-          '--input-type=module',
-        ],
-        false,
-        await readFile('tests/fixtures/production-probe.mjs', 'utf8'),
-      );
+      await docker(['stop', 'backup']);
+      try {
+        await docker(
+          [
+            'run',
+            '--rm',
+            '-T',
+            '--no-deps',
+            '--entrypoint',
+            'node',
+            'operator',
+            '--input-type=module',
+          ],
+          false,
+          (await readFile(
+            'tests/fixtures/production-probe-cleanup.mjs',
+            'utf8',
+          )) +
+            '\nglobalThis.cleanupProductionProbe = cleanupProductionProbe;\n' +
+            (await readFile('tests/fixtures/production-probe.mjs', 'utf8')),
+        );
+      } finally {
+        await docker(['up', '-d', '--wait', '--wait-timeout', '180', 'backup']);
+      }
       await writeFile(
         '.local/phase-9-rehearsal-verified.json',
         JSON.stringify(

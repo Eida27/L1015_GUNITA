@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { readFile } from 'node:fs/promises';
 import { parseEnv } from 'node:util';
 import { readRehearsal } from '../../scripts/rehearsal-lib.mjs';
+import { checkBackupRecovery } from './backup-recovery-check.mjs';
 
 const receipt = await readRehearsal();
 const args = [
@@ -69,23 +70,7 @@ run([
   "fetch('http://127.0.0.1:3000/api/ready').then(r=>process.exit(r.status===200?0:1)).catch(()=>process.exit(2))",
 ]);
 console.log('PASS same owned DB recovery restores readiness200');
-const failed = run(
-  [
-    'run',
-    '--rm',
-    '--no-deps',
-    '-e',
-    'BACKUP_KEY_FILE=/keys/deliberately-missing',
-    'backup',
-    'backup',
-    '--once',
-  ],
-  1,
-);
-assert.match(failed, /backup_failed/);
-run(['exec', '-T', 'backup', 'node', 'scripts/job-health.mjs', 'backup'], 1);
-run(['run', '--rm', '--no-deps', 'backup', 'backup', '--once']);
-run(['exec', '-T', 'backup', 'node', 'scripts/job-health.mjs', 'backup']);
+await checkBackupRecovery(run);
 console.log(
   'PASS backup failure is unhealthy; actual successful retry repairs health',
 );

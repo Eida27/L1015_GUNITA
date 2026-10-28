@@ -2,6 +2,7 @@ import { expect, it } from 'vitest';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { checkBackupRecovery } from '../fixtures/backup-recovery-check.mjs';
 import { loadServiceSecret } from '../../scripts/container-secrets.mjs';
 import {
   runScheduledJob,
@@ -30,6 +31,96 @@ it('rejects operator credentials and process injection in a web secret before mo
   expect(env).toEqual({
     DATABASE_URL: 'runtime',
     BETTER_AUTH_SECRET: 'secret',
+  });
+});
+
+it('drains the scheduled backup before fault injection and resumes it even when a one-off fails unexpectedly', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'gunita-backup-order-'));
+  const file = join(directory, 'backup.json');
+  const signal = new AbortController();
+  let release, started;
+  const entered = new Promise((resolve) => {
+    started = resolve;
+  });
+  const blocked = new Promise((resolve) => {
+    release = resolve;
+  });
+  let active = 0,
+    maximum = 0,
+    resumed = false;
+  const scheduled = runScheduledJob({
+    name: 'backup',
+    intervalMs: 10000,
+    signal: signal.signal,
+    job: async () => {
+      maximum = Math.max(maximum, ++active);
+      started();
+      await blocked;
+      active--;
+    },
+    writeState: (next) => writeJobState(file, next),
+    log: () => {},
+  });
+  await entered;
+  const run = async (args) => {
+    if (args[0] === 'stop') {
+      signal.abort();
+      expect(active).toBe(1);
+      release();
+      await scheduled;
+      expect(JSON.parse(await readFile(file, 'utf8')).ok).toBe(true);
+    } else if (args[0] === 'up') resumed = true;
+    else if (args[0] === 'run') {
+      maximum = Math.max(maximum, ++active);
+      active--;
+      throw new Error('one-off failed unexpectedly');
+    }
+  };
+  try {
+    await expect(checkBackupRecovery(run)).rejects.toThrow(
+      'one-off failed unexpectedly',
+    );
+    expect(maximum).toBe(1);
+    expect(resumed).toBe(true);
+  } finally {
+    signal.abort();
+    release();
+    await scheduled;
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+it('checks failed and repaired backup health while the scheduler is stopped, then resumes it', async () => {
+  let stopped = false,
+    healthy = true,
+    backups = 0,
+    healthChecks = 0;
+  await checkBackupRecovery(async (args, expected = 0) => {
+    if (args[0] === 'stop') {
+      stopped = true;
+      return '';
+    }
+    if (args[0] === 'up') {
+      expect(healthy).toBe(true);
+      stopped = false;
+      return '';
+    }
+    expect(stopped).toBe(true);
+    expect(args[0]).toBe('run');
+    if (args.includes('--entrypoint')) {
+      healthChecks++;
+      expect(expected).toBe(healthy ? 0 : 1);
+      return '';
+    }
+    backups++;
+    healthy = !args.includes('BACKUP_KEY_FILE=/keys/deliberately-missing');
+    expect(expected).toBe(healthy ? 0 : 1);
+    return healthy ? '' : 'backup_failed';
+  });
+  expect({ stopped, backups, healthChecks }).toEqual({
+    stopped: false,
+    backups: 2,
+    healthChecks: 2,
   });
 });
 
