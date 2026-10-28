@@ -1,5 +1,7 @@
 # Phase 0 implementation report
 
+Historical report moved from accidentally tracked plan scratch during Phase10. It describes the Phase0 artifact, not the final feature set. The initial database image was upgraded in [Phase1](phase-1.md); later features/acceptance are indexed in [Phase10](phase-10.md). The inactive-clone policy residual below remains disclosed. The original scratch workspace is retained locally for controller review.
+
 Status: Phase 0 functional exit gate PASS, including literal fresh-clone proof. Test containers, networks and volume removed; temporary clone-directory deletion remains automatically approval-blocked.
 
 Application commit: `6eeef800cae946bcfed12d2322c9f595a892ff38` (`feat: establish Gunita local-first foundation`). Baseline: `b4532bd`; branch: `implementation/local-first`. No remote, push, deployment, schema migration, user account, map, or thought content was created. The approved specification and plan files are unchanged.
@@ -17,25 +19,25 @@ Application commit: `6eeef800cae946bcfed12d2322c9f595a892ff38` (`feat: establish
 
 All npm pins were queried from the registry before use, installed with exact package versions, and integrity-bound by the committed pnpm lockfile.
 
-| Component | Exact version |
-| --- | --- |
-| Node LTS | 24.19.0 |
-| pnpm | 11.25.0 |
-| Next.js / eslint-config-next | 16.4.2 |
-| React / React DOM | 19.3.1 |
-| Zod | 4.6.7 |
-| pg | 8.23.1 |
-| TypeScript | 6.0.3 |
-| ESLint | 9.39.5 |
-| Prettier | 3.9.10 |
-| Vitest / Vite | 5.0.5 / 8.3.4 |
-| Playwright | 1.64.1 |
-| @types/node | 24.19.2 |
-| @types/react / @types/react-dom | 19.3.0 |
-| PostgreSQL / PostGIS in selected image | 17.5 / 3.5 |
-| Mailpit | 1.31.6 |
-| Optional Caddy | 2.11.7-alpine |
-| Docker daemon observed | 29.8.2 |
+| Component                              | Exact version |
+| -------------------------------------- | ------------- |
+| Node LTS                               | 24.19.0       |
+| pnpm                                   | 11.25.0       |
+| Next.js / eslint-config-next           | 16.4.2        |
+| React / React DOM                      | 19.3.1        |
+| Zod                                    | 4.6.7         |
+| pg                                     | 8.23.1        |
+| TypeScript                             | 6.0.3         |
+| ESLint                                 | 9.39.5        |
+| Prettier                               | 3.9.10        |
+| Vitest / Vite                          | 5.0.5 / 8.3.4 |
+| Playwright                             | 1.64.1        |
+| @types/node                            | 24.19.2       |
+| @types/react / @types/react-dom        | 19.3.0        |
+| PostgreSQL / PostGIS in selected image | 17.5 / 3.5    |
+| Mailpit                                | 1.31.6        |
+| Optional Caddy                         | 2.11.7-alpine |
+| Docker daemon observed                 | 29.8.2        |
 
 Verified later-phase candidates, recorded in ADRs but not prematurely installed/implemented: Better Auth and separate `@better-auth/drizzle-adapter` 1.7.11; Drizzle ORM 0.45.4 / Kit 0.31.11; MapLibre GL JS 6.15.0; h3-js 4.5.0.
 
@@ -65,22 +67,22 @@ An initial E2E attempt failed before browser launch because Chromium was not ins
 
 All commands used bundled Node 24.19.0 first in PATH. Initial package installation took 12m39.1s under host memory pressure; no failure was inferred as a pass. The host has 4 logical CPUs / 8 GB RAM (Pentium Silver N5030); Vitest, Playwright, and Next static workers are bounded to one. Builds used a process-local 1536 MB Node heap cap and disabled telemetry.
 
-| Command / observation | Result |
-| --- | --- |
-| `pnpm install --frozen-lockfile` (main checkout) | PASS, Already up to date; 6s; exit 0 |
-| `pnpm peers check` | PASS, no peer issues; exit 0 |
-| `pnpm lint` | PASS after correcting Next's root-link lint error with `next/link`; final exit 0 |
-| `pnpm format:check` | PASS, all matched files use Prettier style; exit 0 |
-| `pnpm typecheck` | PASS, route types generated and tsc exit 0 |
-| `pnpm test` | PASS, 19 tests / 3 files, 13.04s; exit 0 |
-| `pnpm build` | PASS, final rebuild compiled 15.8s, TypeScript 26.9s; all static pages generated; exit 0 |
-| `LOCAL_PREVIEW=true pnpm start` | PASS, standalone bound to 127.0.0.1:3000 |
-| `pnpm test:e2e` | PASS, 3 tests, 9.3s; exit 0 |
-| `/api/health` and `/api/ready` | PASS, 200 `{status:'ok'}`, `Cache-Control:no-store` |
-| Main DB/Mailpit | PASS, both healthy; SQL/database/extensions and real Mailpit HTTP/SMTP observed |
-| Optional Caddy profile | PASS, pinned image started; `127.0.0.1:8088/api/health` and `/api/ready` both 200; then stopped optional Caddy |
-| `git diff --cached --check` before application commit | PASS, no whitespace errors |
-| Secret and approved-document check | Only `.env.example` tracked; `.env` ignored; approved spec/plan absent from staged diff |
+| Command / observation                                 | Result                                                                                                         |
+| ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `pnpm install --frozen-lockfile` (main checkout)      | PASS, Already up to date; 6s; exit 0                                                                           |
+| `pnpm peers check`                                    | PASS, no peer issues; exit 0                                                                                   |
+| `pnpm lint`                                           | PASS after correcting Next's root-link lint error with `next/link`; final exit 0                               |
+| `pnpm format:check`                                   | PASS, all matched files use Prettier style; exit 0                                                             |
+| `pnpm typecheck`                                      | PASS, route types generated and tsc exit 0                                                                     |
+| `pnpm test`                                           | PASS, 19 tests / 3 files, 13.04s; exit 0                                                                       |
+| `pnpm build`                                          | PASS, final rebuild compiled 15.8s, TypeScript 26.9s; all static pages generated; exit 0                       |
+| `LOCAL_PREVIEW=true pnpm start`                       | PASS, standalone bound to 127.0.0.1:3000                                                                       |
+| `pnpm test:e2e`                                       | PASS, 3 tests, 9.3s; exit 0                                                                                    |
+| `/api/health` and `/api/ready`                        | PASS, 200 `{status:'ok'}`, `Cache-Control:no-store`                                                            |
+| Main DB/Mailpit                                       | PASS, both healthy; SQL/database/extensions and real Mailpit HTTP/SMTP observed                                |
+| Optional Caddy profile                                | PASS, pinned image started; `127.0.0.1:8088/api/health` and `/api/ready` both 200; then stopped optional Caddy |
+| `git diff --cached --check` before application commit | PASS, no whitespace errors                                                                                     |
+| Secret and approved-document check                    | Only `.env.example` tracked; `.env` ignored; approved spec/plan absent from staged diff                        |
 
 Main service facts and independent controller proof: `.superpowers/sdd/IMPLEMENTATION_PLAN/phase-0-services-evidence.json` and `phase-0-readiness-green.json`. Actual database is `gunita`, PostgreSQL 17.5, PostGIS 3.5, `postgis`/topology/tiger extensions present. Mailpit HTTP 200 and real SMTP `220` banner observed. Internal `gunita_database` network remains `Internal=true`.
 

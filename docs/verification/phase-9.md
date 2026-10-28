@@ -1,5 +1,7 @@
 # Phase9 — portable deployment package
 
+Final controller disposition: complete at `5ab8f2a` (initial `9d808d6` plus repair). [Scoped re-review](reviews/task-9-rereview-1.md) closed P9-I01/I02 with no new C/I/M. Historical pending-review statements below refer to earlier handoffs. Public deployment is not certified.
+
 Implementation prepares production deployment and proves an isolated local staging simulation. No real domain/VPS/provider was selected or deployed, no public ingress enabled, no real provider credentials used, and no push/PR/merge performed. Earlier Phase7/8 Browser acceptance belongs to the controller; this phase did not replace or mutate its retained database/identities/thought.
 
 ## Contracts and package

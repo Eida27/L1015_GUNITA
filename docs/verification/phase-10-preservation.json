@@ -1,0 +1,54 @@
+{
+  "observedAt": "2026-10-28T03:35:17.057Z",
+  "mutation": false,
+  "ready3000": {
+    "status": 200,
+    "cacheControl": "no-store",
+    "body": {
+      "status": "ok"
+    }
+  },
+  "ready3001": {
+    "status": 200,
+    "cacheControl": "no-store",
+    "body": {
+      "status": "ok"
+    }
+  },
+  "mainContainers": [
+    {
+      "id": "bef039778816",
+      "status": "running",
+      "health": "healthy",
+      "volumes": ["gunita_pgdata"]
+    },
+    {
+      "id": "8aff39410feb",
+      "status": "running",
+      "health": "healthy",
+      "volumes": []
+    }
+  ],
+  "main": {
+    "users": 3,
+    "thoughts": 0,
+    "areas": 87,
+    "migrations": 7
+  },
+  "testDatabases": [
+    "gunita_test_7919223391409efc",
+    "gunita_test_e7153586855c485a"
+  ],
+  "testRoles": [
+    "gunita_test_m_791922339140",
+    "gunita_test_m_e7153586855c",
+    "gunita_test_r_791922339140",
+    "gunita_test_r_e7153586855c"
+  ],
+  "original": {
+    "bodyMatches": true,
+    "createdMatches": true,
+    "expiresMatches": true,
+    "published": true
+  }
+}

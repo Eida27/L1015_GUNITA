@@ -1,0 +1,7 @@
+- I1 Missing runtime output contracts - ADDRESSED. src/lib/thought-contract.ts:32 defines strict public, consent, viewer and mutation schemas; derived types at69. src/server/thoughts/service.ts:46 validates actual response and producer failures become generic500, input422 preserved. Public allowlist/fixedlifetime/currentconsent intact.
+- M1 Cancel retains discarded edits - ADDRESSED. thought-detail.tsx:95 resets body/emotion/error from loadedcontent; Cancel/freshEdit invoke at209/220.
+- M2 Private viewer suppresses public read - ADDRESSED. thought-detail.tsx:74 isolates viewerfailures; management resetsfalse61; publiccontent preserved86; abort/liveack58; Savefocus waitsforremount50.
+- New Breakage: None found.
+- Out-of-Scope Observations: None.
+- Checks: supplieddiff/appendedreport against namedcontract/actualDB/Browserregressions.13/13focused and6/6Browser includingCancel/reopen/failedviewerrefresh/liveack/Savefocus. No testsrerun/checkoutunchanged.
+- Fixround: All findings addressed, no new Critical/Important breakage. Fresh/root/phase5_rereview1,gpt-6.1-sol/high,range9b51f0a..0a0b974.

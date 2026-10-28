@@ -1,0 +1,52 @@
+# Phase 6 task review
+
+## Spec compliance
+
+- **Spec compliant for the reviewed task scope.** No missing, extra, or misunderstood Phase 6 behavior requiring a fix was identified in the supplied package. **Task quality: Approved**, with the minor evidence/coverage findings below.
+- Reviewed BASE `0a0b97417f71f52cfa8dfb58680e2e711e7a211a` through HEAD `f24536a275a1c518f45e3d2ef4a740dc774e8115`. This is the task-scoped gate before Phase 7, not a whole-branch or production-readiness approval.
+- Requirements reviewed first: `task-6-brief.md`, `review-global-constraints.md`, and `task-6-review-constraints.md`. The full implementer report, including final disposition, and independent `phase-6-browser-checklist.md` were read. The supplied contextual diff was read once in four bounded, sequential passes; the whole implementation plan was not read.
+
+## Strengths
+
+- `src/server/thoughts/interactions.ts:117`: new private operations run inside the actual auth transaction, explicitly select READ COMMITTED, and obtain fresh verified/active account state before operating on thoughts. The interaction write path subsequently locks the target, rejects self-interaction, rechecks current visibility after waiting, and checks it again after writing. Toggle parity and bookmark uniqueness are exercised with concurrent real database requests in `tests/integration/interactions.test.ts:1`.
+- `src/server/thoughts/interactions.ts:117` and `src/lib/thought-contract.ts:53`: own lists restrict the author to the authenticated actor; bookmarks restrict the bookmark owner; separate totals authorize only the author or current admin. Public thought mapping allowlists fields and adds only the four constant reaction types. Strict output schemas reject accidental additional fields and malformed producers; private successes and errors use `private, no-store`.
+- `src/server/thoughts/service.ts:185`: the existing viewer boundary now delegates to a private three-field state producer, retaining owner-only management while providing only the caller's reaction/bookmark state. Hidden targets do not expose interaction state. Ruling6 is implemented consistently by the published predicate in own lists and totals; optional author discovery of hidden posts is deliberately absent, with its usability cost recorded rather than treated as evidence of a missing mandatory feature.
+- `src/components/thoughts/dashboard-view.tsx:1` and `src/components/thoughts/thought-detail.tsx:1`: dashboard content is fetched through the acknowledgment gate, response schemas are checked on consumption, private state is cleared across focus/visibility restoration, and stale private completions are guarded by epochs. Expiration scheduling caps the browser timer and then rechecks the real deadline. New controls use semantic pressed state, pending-state disabling, localized labels, and existing author edit/delete actions.
+- `src/lib/validation/json.ts:1`: the empty-body repair is a narrow opt-in. It counts actual streamed bytes, preserves strict schema validation, rejects nonempty wrong-media bodies, and leaves the default JSON-required path intact. The new real-boundary empty-stream regression test complements the existing parser tests.
+- `tests/e2e/interactions.spec.ts:1`: the HTTP matrix checks author/admin/private state versus non-author/public/map/HTML responses and cache headers on the actual standalone. The independent controller Browser report separately supports guest/member/author isolation, reaction changes, bookmark removal with heading focus, account switching, mobile Filipino themes, and map/list filter agreement. It is corroborating UI evidence, not a substitute for server-side authorization tests.
+
+## Issues
+
+### Critical
+
+- None found in the reviewed scope.
+
+### Important
+
+- None found in the reviewed scope.
+
+### Minor
+
+- **P6-M01 — Historical full-suite reliability remains unresolved.** `docs/verification/phase-6.md:29`: the original full run was 113 passed / 1 failed because an existing auth deletion lifecycle exceeded its unchanged five-second limit. The interrupted diagnostic retry supplies no passing full-run verdict. The later unchanged-auth 25/25 run and measured 3055ms completion support that the isolated lifecycle works, but do not establish why the original full run timed out. Consequence: the branch cannot be represented as having a pristine current full-suite receipt. Keep this limitation visible for the root's broad validation; if that validation reproduces it, investigate the shared execution conditions and named lifecycle before changing a timeout. No auth/full-suite rerun was performed for this review, in accordance with controller direction.
+- **P6-M02 — Pagination boundary lacks a behavioral test.** `tests/integration/interactions.test.ts:1`; implementation at `src/server/thoughts/interactions.ts:117`: the tests exercise one active thought and do not cover the new 20-item page plus continuation behavior. The SQL/keyset construction appears correct on inspection, so this is not a demonstrated product bug. A focused future case with at least 21 owned or bookmarked active thoughts should assert the page cap, continuation, absence of duplicate/foreign rows, and exclusion of hidden/expired records across pages. The current passing tests do not substantiate those boundary behaviors.
+
+## Cannot verify from this diff
+
+- **CV6-01 — Unchanged retention machinery and broad invariants.** `src/server/thoughts/interactions.ts:117` uses the existing publication predicate, and `tests/integration/interactions.test.ts:1` demonstrates dependent rows disappearing after author deletion plus expired targets being unavailable. Scheduled expiry deletion within one hour, account-deletion cascades across all data, restore handling, and broader quota/geography guarantees live outside this change. Root should retain the earlier producer evidence and assess them in its final broad review; this task does not freshly prove them.
+- **CV6-02 — Unchanged map implementation.** `tests/e2e/interactions.spec.ts:1` verifies the nine-category selector and populated/empty query/list alignment, supported by the controller Browser checklist. The unchanged server's full antimeridian, 1,000-feature aggregation, 10,000-thought performance, and cache behavior cannot be re-established from this task diff. Root should carry forward Phase 4 evidence rather than infer those guarantees from these new UI tests.
+- **CV6-03 — Existing settings/security implementation.** `src/components/auth/settings-view.tsx:27` adds dashboard navigation to the existing settings view. The complete pseudonym, verification, password, reauthentication, and deletion implementation is unchanged and not included in the review package. Root should use the Phase 2 contracts/evidence and preserve P6-M01's qualification.
+- **CV6-04 — Raw execution and operational receipts.** `docs/verification/phase-6.md:22` records build, lint, typecheck, formatting, artifact audit, fixture cleanup, and runtime receipts. Their raw ignored logs, screenshots, database inventory, and live process ownership were not independently reopened or rerun by this task reviewer. The complete implementation report and independent controller Browser account were assessed as supplied evidence, with code/test assertions inspected in the diff.
+- **CV6-05 — Passing Browser coverage is distributed.** `docs/verification/phase-6.md:33`: the original covering Browser run was 5/4; the amended run was 7/2; the focused repair run was 1/1; the final member-only run passed 1/1. The reported corrections and unchanged product artifact support the passing behaviors collectively, and the controller's independent UI pass corroborates them. They are not a new pristine nine-case suite pass, nor a pristine full unit/integration suite pass.
+
+## Focused external checks and review boundaries
+
+- **Shared-parser default callers:** searched `parseJsonBody` call sites in `src` and the named existing `tests/unit/http.test.ts`. Reason: the interaction repair changes a shared input boundary. Existing auth, thought, and map-preview callers retain the default options; only empty interaction input opts in. Existing parser test calls remain on the default path. No default caller compatibility defect was identified.
+- **Same-client account-first locking:** read `src/server/auth/guards.ts` and focused transaction/lock context in `src/server/auth/service.ts` (not the whole service). Reason: the new transaction depends on the existing guard's lock order and live-state behavior. `src/server/auth/service.ts:44` owns one client from BEGIN through COMMIT/rollback; `lockAccount` locks the user before profile, and the guard revalidates the live session and active/verified state on that client. This is consistent with the new interaction target lock following the actor lock. No new lock-order inversion was identified in that checked contract; this is not a proof of future Phase 7 moderation lock ordering.
+- **Extended DTO consumers:** searched the public/viewer schema and type references in `src`, excluding the already reviewed consumers/definitions. Reason: strict shape extensions can break unchanged consumers. The remaining consumer surfaced was the composer's `PublicThought` callback type (`src/components/thoughts/composer.tsx:26`); no additional unchanged strict viewer decoder surfaced. The changed consumers were inspected in the supplied diff. The reported current-tree typecheck and lifecycle Browser coverage provide additional compatibility evidence without rerunning them.
+- No changed file was separately reopened to complete a function; the contextual diff was sufficient for the reviewed changes. No broad repository crawl, git command, test run, helper agent, product edit, index change, commit, branch change, runtime restart, or database mutation was performed. The only write is this ignored review report.
+
+## Assessment
+
+**Spec compliance: Spec compliant for Phase 6; unchanged/spanning guarantees remain explicitly qualified above.**
+
+**Task quality: Approved.** The implementation enforces the task's principal privacy and ownership boundaries on the server, with strict DTOs and meaningful real-auth/database and actual-browser tests. No task-blocking defect was identified; preserve the historical full-suite failure and distributed Browser evidence accurately, and leave the final broad review and any fix loops with the root.

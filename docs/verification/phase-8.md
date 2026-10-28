@@ -1,6 +1,6 @@
 # Phase8 quality evidence
 
-Status: implemented; review fix P8-I01 is awaiting scoped re-review and final manual Browser acceptance belongs to the controller. Local-only; actual offsite credentials and deployment remain blocked. The final inspection-label artifact passed the affected history check; earlier artifact results below are preserved explicitly.
+Status: complete at `c4b069d` after controller acceptance. [Scoped re-review](reviews/task-8-rereview-1.md) closed P8-I01 with no new findings; [actual Browser acceptance](phase-8-browser-receipt.md) closed October27, with October28 restoration follow-up. Historical pending/failure notes below preserve their original attribution. Local-only; real offsite/deployment gates remain open. The final inspection-label artifact passed the affected history check; earlier results remain separate.
 
 HSTS trust handoff: headers use validated server `APP_ORIGIN`, not client `Forwarded`/`X-Forwarded-Proto`. An HTTPS production origin behind the later TLS-terminating proxy receives HSTS even when the internal Next listener uses HTTP. Local HTTP preview does not. Phase9 must configure and validate that topology; this phase adds no general forwarded-header trust framework.
 

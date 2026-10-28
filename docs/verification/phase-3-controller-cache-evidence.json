@@ -1,0 +1,12 @@
+{
+  "commit": "518fda50e17f25cb225e939e0d5091dfb9a6f30a",
+  "origin": "http://127.0.0.1:3000",
+  "login": 200,
+  "settings": {
+    "status": 200,
+    "cacheControl": "private, no-cache, no-store, max-age=0, must-revalidate"
+  },
+  "account": { "status": 200, "cacheControl": "private, no-store" },
+  "logout": 200,
+  "sensitiveValuesRecorded": false
+}

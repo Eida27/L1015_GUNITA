@@ -1,6 +1,6 @@
 # Accepted architecture decisions
 
-Status: accepted by the approved [design specification](../specs/IMPLEMENTATION_DESIGN_SPEC.md). This inventory records the rationale; implementation proceeds in plan order. Acceptance of an architecture does not mean its later phase is implemented.
+Status: accepted by the approved [design specification](../specs/IMPLEMENTATION_DESIGN_SPEC.md). Phases0–9 are implemented and controller-approved; Phase10 task/final whole-branch review remain pending. The phase boundaries below describe original ownership. See [current architecture](../architecture.md), [nine exact rulings with reasons/costs](../verification/rulings.md), and [evidence](../verification/phase-10.md). Accepted architecture and local proof do not authorize public launch.
 
 | ADR | Decision and rationale                                                                                                                                                                  | Implementation boundary                                                 |
 | --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
@@ -15,22 +15,22 @@ Status: accepted by the approved [design specification](../specs/IMPLEMENTATION_
 | 009 | Reaction totals belong only to the author/authorized moderator. Separate private uncached APIs prevent public DTO/cache leakage.                                                        | Interaction phase.                                                      |
 | 010 | Compose enables paid-service-free local development and later portable VPS packaging. Production provisioning, TLS, providers and public launch require their own gates.                | Local services now; production packaging later.                         |
 
-Additional accepted decisions: [ADR 011: database integrity and least privilege](011-database-integrity.md), [ADR 012: early spatial baseline refresh](012-postgis-baseline-refresh.md).
+Additional accepted decisions: [ADR011: database integrity/least privilege](011-database-integrity.md), [ADR012: early spatial refresh](012-postgis-baseline-refresh.md), [ADR013: account lifecycle/locks](013-account-lifecycle.md), [ADR014: coarse map locations](014-coarse-map-locations.md), [ADR015: moderation/verification/category](015-moderation-and-verification.md). Ruling9's narrowly validated internal-container preview is documented in [deployment](../operations/deployment.md); it preserves the existing local auth/Turnstile contract.
 
 ## Foundation details
 
 - Local development publishes PostgreSQL only to `127.0.0.1:55435` for the host-run application and tools. Docker's `database` network remains internal. A separate `host-access` bridge contains only the DB and enables host port publishing: an internal-only attachment produced an empty published-port map on Docker Desktop and made the host app's readiness check fail. This development bridge permits DB egress; it is an explicit local-only exception to production isolation, never a production Compose template.
-- Mailpit is bound only to loopback (`1028` SMTP, `8028` web). Its stored mail is ephemeral in Phase 0. Caddy is an optional local HTTP profile on loopback `8088`; HTTPS production configuration is later work.
+- Mailpit binds loopback (`1028` SMTP, `8028` web), with ephemeral local mail. Optional development Caddy uses HTTP8088. Phase9 supplies a separate production HTTPS template and verified loopback TLS rehearsal; actual public TLS remains a launch gate.
 - Native Node 24.19.0 LTS and pnpm 11.25.0 are pinned. TypeScript 6.0.3 is chosen because current ESLint TypeScript parser supports `<6.1.0`; installing the registry's TypeScript 7 default would violate that peer contract.
 - The registry marks ESLint 9 as end-of-support. It is retained as a compatible tooling baseline because Next's bundled React/import/accessibility plugins reject ESLint 10 in their peer ranges. Upgrade this pin when those peer contracts support 10; this is an explicit tooling limitation, not a claim that the toolchain has no deprecations.
 - `/api/health` is process liveness, not database readiness. `/api/ready` checks PostgreSQL separately and returns a generic 503 on failure. Both are uncached and disclose no configuration.
-- Production startup validates configuration before loading the generated standalone server. An explicit `LOCAL_PREVIEW=true` permits production-binary smoke tests only on a loopback origin and loopback bind; it is not a production-launch mode.
+- Production startup validates before generated-server import. `LOCAL_PREVIEW=true` permits a loopback origin/bind. Only explicit validated `CONTAINER_PREVIEW=true` with preview+proxy permits an internal container listener for the isolated loopback-Caddy rehearsal; no web/DB host ports. Neither is public-launch validation.
 - No GitHub remote exists. GitHub Actions is deferred until GitHub use is selected; all present checks are reproducible locally without CI secrets.
-- Plain CSS tokens keep the foundation small and accessible. Reusable theme/localization controls belong to Phase 3, so the foundation only follows the OS color scheme.
+- Plain CSS tokens and reusable EN/Fil/light/dark/system controls now implement the shell. The earlier foundation's OS-only behavior is historical.
 
 ## Version inventory
 
-Queried from the npm registry on 2026-10-19. Installed dependencies are exact in `package.json` and transitive dependencies are integrity-bound in `pnpm-lock.yaml`. Reserved later-phase pins below are verified candidates; install and review APIs before those phases.
+Original registry inventory:2026-10-19. Installed pins are exact in `package.json` and lockfile. MapLibre/H3 below were subsequently installed and verified in Phase4; the table retains original pin provenance.
 
 | Package                                    | Version          | State                                                                   |
 | ------------------------------------------ | ---------------- | ----------------------------------------------------------------------- |
@@ -47,8 +47,8 @@ Queried from the npm registry on 2026-10-19. Installed dependencies are exact in
 | @types/react / react-dom                   | 19.3.0           | Installed                                                               |
 | Better Auth / @better-auth/drizzle-adapter | 1.7.11           | Installed Phase 1; auth CLI also pinned 1.7.11                          |
 | Drizzle ORM / Kit                          | 0.45.4 / 0.31.11 | Installed Phase 1                                                       |
-| MapLibre GL JS                             | 6.15.0           | Reserved for map                                                        |
-| h3-js                                      | 4.5.0            | Reserved for location privacy                                           |
+| MapLibre GL JS                             | 6.15.0           | Installed Phase4                                                        |
+| h3-js                                      | 4.5.0            | Installed Phase4                                                        |
 
 Docker manifests were inspected using `docker buildx imagetools inspect`; Compose pins immutable SHA-256 index digests. Phase 1 replaced the retired Phase 0 PostgreSQL 17.5/PostGIS 3.5.2 image with verified PostgreSQL 17.11/PostGIS 3.6.4; see [ADR 012](012-postgis-baseline-refresh.md) for backup, restore, extension/collation upgrade and current digest evidence. Mailpit remains 1.31.6. These local pins establish reproducibility, not production vulnerability certification.
 

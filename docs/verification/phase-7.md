@@ -1,5 +1,7 @@
 # Phase 7: reports, moderation and anti-abuse
 
+Final controller disposition: complete at `8f92126`, after [three scoped reviews](reviews/README.md) and final-source build/actual Browser acceptance carried into and closed in [Phase8](phase-8.md). Historical blocked/pending notes below are preserved; see the [final Browser receipt](phase-8-browser-receipt.md). Failed full-suite receipts are not relabeled.
+
 ## Review fix round 3
 
 Scoped review accepted returned-item inspection auditing but found that fix2's original boundary cursor could disclose a deleted or newly ineligible, unaudited account UUID. R2 now retains only a `hasMore` discovery flag and derives continuation from the last freshly returned and audited account. If all locked candidates disappear, an empty page with null cursor avoids disclosing any of them; the existing Refresh control starts a new listing. No unlocked refill, extra retained identity, opaque-token protocol, schema, privilege or lock-order change.

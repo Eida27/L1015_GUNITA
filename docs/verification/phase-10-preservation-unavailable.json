@@ -1,0 +1,13 @@
+{
+  "observedAt": "2026-10-28T03:26:04.922Z",
+  "mutation": false,
+  "ready3000": {
+    "available": false
+  },
+  "ready3001": {
+    "available": false
+  },
+  "mainContainersAvailable": false,
+  "mainAvailable": false,
+  "retainedAvailable": false
+}
