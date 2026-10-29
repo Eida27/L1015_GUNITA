@@ -1,0 +1,66 @@
+{
+  "checkedAt": "2026-10-29T11:35:01.1283647+00:00",
+  "reviewedSourceHead": "e4eb30ab1424fcb4f36fc27aad2f7ed02ecfad37",
+  "project": "gunita-rehearsal-a817917e",
+  "removedContainers": [
+    {
+      "id": "6704e8f30ae8376ffd982488ddad7f777aec2150f079779eb1f5922cf1ad6b5e",
+      "service": "caddy",
+      "logDriver": "local"
+    },
+    {
+      "id": "2f2d83c6ee666fc91812caab85a96d829ceb6fe31404823ac374943f130bc10f",
+      "service": "web",
+      "logDriver": "local"
+    },
+    {
+      "id": "0767d9e726e085164691dfc0ae21ca89f0ff23648674931dec706296c41227b4",
+      "service": "metrics",
+      "logDriver": "local"
+    },
+    {
+      "id": "ee7d7660c276943cd6fbb53661278899893d1ca2694168d9d67514ec7dc432e0",
+      "service": "maintenance",
+      "logDriver": "local"
+    },
+    {
+      "id": "ec3ea5ce91f0f81f95a2828692fb6a028b08dd9d57dc74d4704f24a08cbd9e22",
+      "service": "db",
+      "logDriver": "local"
+    },
+    {
+      "id": "a57e04d884188d8c3424a40de1e1361c31dd2431f916e10971aadcf3edfb305a",
+      "service": "backup",
+      "logDriver": "local"
+    },
+    {
+      "id": "5f2115cef1f7947de36c49fe61b28baa4e34259b4c079279077b6f444f21e201",
+      "service": "mailpit",
+      "logDriver": "local"
+    }
+  ],
+  "remainingProjectContainers": 0,
+  "remainingProjectNetworks": 0,
+  "preservedVolumes": [
+    "gunita-rehearsal-a817917e_backup-keys",
+    "gunita-rehearsal-a817917e_caddy-config",
+    "gunita-rehearsal-a817917e_caddy-data",
+    "gunita-rehearsal-a817917e_operations-state",
+    "gunita-rehearsal-a817917e_pgdata",
+    "gunita-rehearsal-a817917e_rehearsal-archives"
+  ],
+  "privateRehearsalFilesRetained": true,
+  "mainContainerIds": [
+    "bef039778816377ef397d92a20ddd2fdb2aae2365d45fcc8279bcb9a2c4943bf",
+    "8aff39410feb8dcc898d223470aad96a0e89227da7b82a7634dac3c5f484f664"
+  ],
+  "mainVolume": "gunita_pgdata",
+  "mainReady": 200,
+  "retainedReady": 200,
+  "mainCacheControl": "no-store",
+  "retainedCacheControl": "no-store",
+  "volumeRemovalRequested": false,
+  "keyOrArchiveContentsInspected": false,
+  "unknownDatabaseTouched": false,
+  "policyBlockedCloneTouched": false
+}

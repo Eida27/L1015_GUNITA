@@ -4,7 +4,7 @@ _A place for feelings left unsaid._
 
 Gunita is an adults-only, Philippines-first map for short feelings, memories and unsent messages. Guests read after a versioned 18+ content acknowledgment; verified members publish, react and save thoughts. Locations are approximate, pseudonyms are permanent, and thoughts disappear after 30 days. English/Filipino UI and light/dark/system themes are included. The age checkbox is self-attestation; permanent pseudonyms allow correlation between posts.
 
-The local feature set is implemented; [32 acceptance cases](docs/verification/acceptance-matrix.md) index its executed evidence. Phase 10 task review and whole-branch review are pending. **Gunita has not publicly launched.** Real providers, legal/privacy review, offsite operations and outside-network checks remain [launch prerequisites](docs/operations/launch-checklist.md). See [release notes](docs/RELEASE_NOTES.md) for validation limits.
+The local feature set is complete and technically approved at source `e4eb30a`; [32 acceptance cases](docs/verification/acceptance-matrix.md) index its executed evidence. Phase 10 task review passed; the single broad review's two Important findings were corrected in one wave and closed by one scoped re-review, with no new findings. [Exact review scope and disposition](docs/verification/reviews/README.md) distinguish that reviewed source from subsequent evidence-only commits. **Gunita has not publicly launched.** Real providers, legal/privacy review, offsite operations and outside-network checks remain [launch prerequisites](docs/operations/launch-checklist.md). See [release notes](docs/RELEASE_NOTES.md) for validation limits.
 
 ## Boot locally
 
@@ -83,7 +83,7 @@ Read the [tests guide](docs/verification/tests.md) before E2 E: fixtures reserve
 
 ## Operator handoff
 
-- [Architecture](docs/architecture.md), [ADRs](docs/adr/README.md), [nine rulings](docs/verification/rulings.md).
+- [Architecture](docs/architecture.md), [ADRs](docs/adr/README.md), [ten rulings](docs/verification/rulings.md).
 - [Migrations/seed/rollback](docs/operations/database.md), [geographic provenance/license](assets/geo/README.md).
 - [Backup/quarantined restore](docs/operations/backups.md), [retention](docs/operations/retention.md), [moderation](docs/operations/moderation.md).
 - [Production package](docs/operations/deployment.md), [launch gates](docs/operations/launch-checklist.md), [reviews](docs/verification/reviews/README.md), [actual UI captures](docs/verification/ui/README.md).

@@ -1,6 +1,6 @@
 # Accepted architecture decisions
 
-Status: accepted by the approved [design specification](../specs/IMPLEMENTATION_DESIGN_SPEC.md). Phases0–9 are implemented and controller-approved; Phase10 task/final whole-branch review remain pending. The phase boundaries below describe original ownership. See [current architecture](../architecture.md), [nine exact rulings with reasons/costs](../verification/rulings.md), and [evidence](../verification/phase-10.md). Accepted architecture and local proof do not authorize public launch.
+Status: accepted by the approved [design specification](../specs/IMPLEMENTATION_DESIGN_SPEC.md). All Tasks 0–10 are complete and controller-approved. The single broad review found two Important issues; one fix wave and one scoped re-review closed both at source `e4eb30a`, with no new findings. The phase boundaries below describe original ownership. See [current architecture](../architecture.md), [ten exact rulings with reasons/costs](../verification/rulings.md), and [evidence](../verification/phase-10.md). Accepted architecture and local proof do not authorize public launch.
 
 | ADR | Decision and rationale                                                                                                                                                                  | Implementation boundary                                                 |
 | --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
@@ -54,4 +54,4 @@ Docker manifests were inspected using `docker buildx imagetools inspect`; Compos
 
 References checked: [Next.js installation](https://nextjs.org/docs/app/getting-started/installation), [standalone output](https://nextjs.org/docs/app/api-reference/config/next-config-js/output), [Vitest configuration](https://vitest.dev/config/), [Playwright configuration](https://playwright.dev/docs/test-configuration), [Better Auth installation](https://better-auth.com/docs/installation), [Drizzle adapter](https://better-auth.com/docs/adapters/drizzle).
 
-- [ADR 016: edit concurrency and report discovery](016-edit-concurrency-and-report-discovery.md) — loaded-snapshot preconditions and Ruling 10 actionable queue; scoped final review pending.
+- [ADR 016: edit concurrency and report discovery](016-edit-concurrency-and-report-discovery.md) — loaded-snapshot preconditions and Ruling 10 actionable queue; scoped final review approved at source `e4eb30a`.

@@ -1,6 +1,6 @@
 # ADR 016: loaded edit preconditions and actionable report discovery
 
-Status: implemented for the consolidated final-review fixes; controller scoped rereview pending. Authority: specification stale-edit 409 contract and [controller Ruling 10](../verification/rulings.md).
+Status: implemented and approved by the single [scoped re-review](../verification/reviews/final-rereview.md) at source `e4eb30ab1424fcb4f36fc27aad2f7ed02ecfad37`, accepted by the controller on 2026-10-29. FBR-I01/I02 are addressed with no new findings; subsequent evidence-only commits do not change the reviewed implementation. Authority: specification stale-edit 409 contract and [controller Ruling 10](../verification/rulings.md). Public launch/integration remain separate authorization and operational gates.
 
 An account/row lock serializes writes but cannot identify a draft loaded before another save. `GET /api/thoughts/:publicId/edit` now freshly authorizes the verified active owner, locks the unexpired row, and returns only `{body, emotion, version}` for published thoughts, with `private, no-store`. After any row-lock wait, a fresh database statement rechecks published/unexpired visibility before disclosure. Hidden targets remain unavailable to this new read, consistent with the existing viewer/dashboard contract. The public DTO and viewer DTO gain no revision or identity fields.
 

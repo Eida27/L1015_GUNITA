@@ -1,6 +1,6 @@
 # Actual local product captures
 
-These unchanged PNGs were captured by the controller using normal Browser UI on fictional retained local fixtures. Phase 10 inspected every selected image before copying it here: no email, password, token, settings or configuration appears. Pseudonyms and public fictional thought text are intentional. The snapshots illustrate observed states; server/DB assertions and review receipts supply the security proof.
+These unchanged PNGs and JPEGs were captured by the controller using normal Browser UI on fictional retained local fixtures. The original five PNGs were inspected in Phase10; the controller inspected all five final-fix JPEGs before curation. No email, password, token, settings or configuration appears. Pseudonyms and public fictional thought text are intentional. Snapshots illustrate observed states; server/DB assertions and review receipts supply the security proof. All copies match their original bytes.
 
 | Capture                                                    | Observed context                                                                                                                                                                                       |
 | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -11,3 +11,15 @@ These unchanged PNGs were captured by the controller using normal Browser UI on 
 | [Restored guest share](phase-9-browser-restored-oct28.png) | October 28 runtime restoration, English/System at default 668 px; same original content/datetime attributes, no management/counts, console empty. Earlier responsive/role gates were not all repeated. |
 
 See [full 7/8 Browser receipt](../phase-8-browser-receipt.md), including partial/blocked attempts and the final passing section. Eight axe contrast-incomplete contexts received visual follow-up; no numeric contrast certification is claimed.
+
+## Final-review fixes — October28/29
+
+| Capture                                                                    | Actual artifact and observation                                                                                                                                                                          |
+| -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [English edit conflict](final-browser-conflict-en.jpg)                     | First artifact: normal author draft survives a competing normal API save; localized409 conflict disables stale save and offers explicit reload.                                                          |
+| [Filipino edit conflict at320px](final-browser-conflict-fil-320.jpg)       | First artifact: both draft inputs retained; readable mobile conflict/reload/retry workflow.                                                                                                              |
+| [Filipino dark moderation at320px](final-browser-queue-fil-dark-320.jpg)   | First artifact: actionable default, explicit status/history views and localized controls, no horizontal overflow.                                                                                        |
+| [English light moderation at1440px](final-browser-queue-en-light-1440.jpg) | First artifact: queue/history/pagination/reset/resolution workflow and responsive desktop layout.                                                                                                        |
+| [Current guest share](final-browser-current-guest.jpg)                     | Final artifact `xhHN262DfbgFrmsztvRMV`: completed ordinary logout, original fictional body/exact datetime values preserved, guest types only/no management, English/System/default1280px, console empty. |
+
+The four first-artifact `.png` filenames in private commentary history contain JPEG bytes; byte-identical `.jpg` copies are curated here with their actual format. Private old aliases remain history only. These first-artifact captures do not prove the later server expiry-while-lock-wait amendment. The final artifact has separate179-test/build/current E2E evidence, and the controller spot-checked its private snapshot/focus/Cancel plus guest restoration. [Exact Browser receipt](../final-browser-receipt.md), [current validation](../final-fix.md).

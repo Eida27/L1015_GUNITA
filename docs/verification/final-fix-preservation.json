@@ -1,0 +1,28 @@
+{
+  "checkedAt": "2026-10-29T11:35:50.994Z",
+  "main": {
+    "users": 3,
+    "thoughts": 0,
+    "areas": 87
+  },
+  "originalBodyAndLifetimePreserved": true,
+  "originalHash": "7e4a2c92c82fe4ebf3ad4099735fb679f4718b6ac9ba72dd403e0b1bdfeb33e2",
+  "dedicatedThoughtPresent": true,
+  "deliberateReports": [
+    {
+      "status": "open",
+      "n": 11
+    },
+    {
+      "status": "reviewing",
+      "n": 10
+    },
+    {
+      "status": "resolved",
+      "n": 46
+    }
+  ],
+  "unknownDatabaseTouched": false,
+  "mainContainers": ["bef039778816", "8aff39410feb"],
+  "volume": "gunita_pgdata"
+}
