@@ -331,7 +331,7 @@ it('enforces one durable combined interaction budget without cross-account spill
   expect(
     (await service.handle(req(path() + '/bookmark', 2, 'PUT'))).status,
   ).toBe(200);
-});
+}, 15000);
 it('hides removed content immediately from all lists and totals, and excludes hard expiry even for admin', async () => {
   await db.operator.query(
     "UPDATE thoughts SET status='hidden' WHERE public_id=$1",

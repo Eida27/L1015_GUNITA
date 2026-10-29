@@ -276,5 +276,10 @@
   "Member": "Member",
   "Thought": "Thought",
   "Account": "Account",
-  "Report": "Report"
+  "Report": "Report",
+  "This thought changed. Your draft is kept. Reload the saved thought before editing again.": "This thought changed. Your draft is kept. Reload the saved thought before editing again.",
+  "Reload saved thought and replace this draft": "Reload saved thought and replace this draft",
+  "Report view": "Report view",
+  "Awaiting action": "Awaiting action",
+  "All reports": "All reports"
 }

@@ -1,6 +1,6 @@
 # Architecture and invariant ownership
 
-Gunita is one Next.js 16.4.2 App Router application (React 19.3.1, TypeScript 6.0.3) on Node 24, with PostgreSQL 17.11/PostGIS 3.6.4, Drizzle 0.45.4, Better Auth/adapter 1.7.11, MapLibre 6.15.0 and H3 4.5.0. Exact pins/integrities live in `package.json`/`pnpm-lock.yaml`; image digests live in Compose/Dockerfile. Plain CSS tokens and typed English/Filipino catalogs implement UI. The ten baseline decisions and ADRs 011–015 are indexed in [ADRs](adr/README.md).
+Gunita is one Next.js 16.4.2 App Router application (React 19.3.1, TypeScript 6.0.3) on Node 24, with PostgreSQL 17.11/PostGIS 3.6.4, Drizzle 0.45.4, Better Auth/adapter 1.7.11, MapLibre 6.15.0 and H3 4.5.0. Exact pins/integrities live in `package.json`/`pnpm-lock.yaml`; image digests live in Compose/Dockerfile. Plain CSS tokens and typed English/Filipino catalogs implement UI. The ten baseline decisions and ADRs 011–016 are indexed in [ADRs](adr/README.md).
 
 ```text
 Browser → Caddy (future production TLS/optional Cloudflare) → Next.js Node
@@ -30,3 +30,5 @@ DB → bounded pg_dump → authenticated encryption → separate archive/key loc
 Development uses host Node plus loopback DB/Mailpit and attributed map fixture. Production has internal DB/proxy networks, outbound provider access, non-root sanitized images and Caddy-only ingress. Dummy-secret rehearsal uses loopback Caddy/request-scoped CA trust; it does not prove real providers/public TLS/Cloudflare/offsite persistence. See [deployment](operations/deployment.md), [launch gates](operations/launch-checklist.md) and [rulings](verification/rulings.md).
 
 Static seed has 87 polygons and zero users/thoughts. Fixtures create random owned DBs/roles and clean only their resources. Main/retained/unknown DBs are not reset by tests. [Acceptance](verification/acceptance-matrix.md) and [reviews](verification/reviews/README.md) record observed invariants/limits.
+
+Author edits use a coherent private body/emotion/version snapshot and an atomic `If-Match` precondition; stale drafts receive 409 and an explicit localized reload path. The audited moderator queue defaults to open/reviewing in oldest-first order with view-bound microsecond keyset cursors and explicit history views. See [ADR 016](adr/016-edit-concurrency-and-report-discovery.md) and [final-fix evidence](verification/final-fix.md).

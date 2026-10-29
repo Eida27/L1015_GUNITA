@@ -11,6 +11,8 @@ import {
   reportsResponseSchema,
   auditResponseSchema,
   accountsResponseSchema,
+  reportViews,
+  reportCursorSchema,
 } from '@/lib/moderation-contract';
 import { inspectReports, submitReport } from './reports';
 import type { TurnstileConfig } from '@/server/security/turnstile';
@@ -115,15 +117,25 @@ export function createModerationService(options: {
           '/api/admin/audit',
           '/api/admin/accounts',
         ].includes(url.pathname) && request.method === 'GET';
+      const reportList =
+        url.pathname === '/api/admin/reports' && request.method === 'GET';
       if (
-        [...url.searchParams.keys()].some((k) => k !== 'cursor') ||
+        [...url.searchParams.keys()].some(
+          (k) => k !== 'cursor' && !(reportList && k === 'view'),
+        ) ||
         url.searchParams.getAll('cursor').length > 1 ||
+        url.searchParams.getAll('view').length > 1 ||
         (!list && url.search)
       )
         throw new ApiError('INVALID_INPUT');
       const cursor = url.searchParams.has('cursor')
-        ? z.uuid().parse(url.searchParams.get('cursor'))
+        ? (reportList ? reportCursorSchema : z.uuid()).parse(
+            url.searchParams.get('cursor'),
+          )
         : null;
+      const view = z
+        .enum(reportViews)
+        .parse(url.searchParams.get('view') ?? 'actionable');
       if (url.pathname === '/api/reports' && request.method === 'POST')
         return await submitReport(request, options);
       const thought = url.pathname.match(
@@ -287,7 +299,7 @@ export function createModerationService(options: {
         if (url.pathname === '/api/admin/reports' && request.method === 'GET')
           return privateJson(
             reportsResponseSchema,
-            await inspectReports(context, actor.userId, cursor),
+            await inspectReports(context, actor.userId, cursor, view),
           );
         throw new ApiError('FORBIDDEN');
       });

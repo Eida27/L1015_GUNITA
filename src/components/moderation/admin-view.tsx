@@ -15,6 +15,8 @@ import {
   reasonCodes,
   type AdminReport,
   type AdminAccount,
+  reportViews,
+  type ReportView,
 } from '@/lib/moderation-contract';
 import { mutationReceiptSchema } from '@/lib/thought-contract';
 import { errorKey, type MessageKey } from '@/lib/i18n/catalog';
@@ -256,6 +258,7 @@ function AdminContent({
   signal: AbortSignal;
 }) {
   const { t, store, locale } = usePreferences();
+  const [view, setView] = useState<ReportView>('actionable');
   const [reports, setReports] = useState<z.infer<
       typeof reportsResponseSchema
     > | null>(null),
@@ -295,7 +298,7 @@ function AdminContent({
       !combined.aborted && !document.hidden && store.isAcknowledged();
     if (active())
       fetch(
-        `/api/admin/${kind}${cursor ? '?cursor=' + encodeURIComponent(cursor) : ''}`,
+        `/api/admin/${kind}?${new URLSearchParams({ ...(kind === 'reports' ? { view } : {}), ...(cursor ? { cursor } : {}) })}`,
         { cache: 'no-store', signal: combined },
       )
         .then(async (response) => {
@@ -319,7 +322,7 @@ function AdminContent({
       window.removeEventListener('pageshow', refresh);
       document.removeEventListener('visibilitychange', visibility);
     };
-  }, [kind, cursor, attempt, signal, store]);
+  }, [kind, cursor, attempt, signal, store, view]);
   useEffect(() => {
     if (!reports?.items.length) return;
     const expiry = Math.min(
@@ -341,6 +344,7 @@ function AdminContent({
     setAudits(null);
     setAccounts(null);
     setError('');
+    setCursor(null);
     setAttempt((n) => n + 1);
     heading.current?.focus();
   }
@@ -371,6 +375,34 @@ function AdminContent({
           {t('Sign out')}
         </Link>
       </nav>
+      {kind === 'reports' ? (
+        <label className="account-form">
+          {t('Report view')}
+          <select
+            value={view}
+            onChange={(event) => {
+              setView(event.target.value as ReportView);
+              refresh();
+            }}
+          >
+            {reportViews.map((value) => (
+              <option key={value} value={value}>
+                {t(
+                  (
+                    {
+                      actionable: 'Awaiting action',
+                      open: 'Open',
+                      reviewing: 'Reviewing',
+                      resolved: 'Resolved',
+                      all: 'All reports',
+                    } as const
+                  )[value],
+                )}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
       <p>
         {t(
           kind === 'accounts'

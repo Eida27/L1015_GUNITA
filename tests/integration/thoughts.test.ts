@@ -249,12 +249,13 @@ it('edits keep lifetime and location, owner checks deny outsiders, deletion cann
   expect(created.status).toBe(201);
   const dto = await created.json();
   const path = `/api/thoughts/${dto.publicId}`;
-  const patch = await service.handle(
-    request(path, 'PATCH', {
-      body: 'Edited fictional hope.',
-      emotion: 'gratitude',
-    }),
-  );
+  const snapshot = await (await service.handle(request(path + '/edit'))).json();
+  const editRequest = request(path, 'PATCH', {
+    body: 'Edited fictional hope.',
+    emotion: 'gratitude',
+  });
+  editRequest.headers.set('if-match', snapshot.version);
+  const patch = await service.handle(editRequest);
   expect(patch.status).toBe(200);
   expect(mutationReceiptSchema.parse(await patch.json())).toEqual({
     status: true,

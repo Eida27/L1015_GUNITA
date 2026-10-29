@@ -174,16 +174,13 @@ it('POST-05: an actual day-29 edit preserves its original day-30 expiry, identit
   const age = Date.now() - Date.parse(before.createdAt);
   expect(age).toBeGreaterThanOrEqual(29 * 86400000);
   expect(age).toBeLessThan(29 * 86400000 + 60000);
-  expect(
-    (
-      await service.handle(
-        request(path, 0, 'PATCH', {
-          body: 'Edited at day 29.',
-          emotion: 'gratitude',
-        }),
-      )
-    ).status,
-  ).toBe(200);
+  const snapshot = await (await service.handle(request(path + '/edit'))).json();
+  const editRequest = request(path, 0, 'PATCH', {
+    body: 'Edited at day 29.',
+    emotion: 'gratitude',
+  });
+  editRequest.headers.set('if-match', snapshot.version);
+  expect((await service.handle(editRequest)).status).toBe(200);
   const after = publicThoughtSchema.parse(
     await (await service.handle(request(path))).json(),
   );

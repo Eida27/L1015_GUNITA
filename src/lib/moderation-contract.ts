@@ -8,6 +8,19 @@ export const reportReasons = [
   'spam',
   'other',
 ] as const;
+export const reportViews = [
+  'actionable',
+  'open',
+  'reviewing',
+  'resolved',
+  'all',
+] as const;
+export type ReportView = (typeof reportViews)[number];
+export const reportCursorSchema = z
+  .string()
+  .min(1)
+  .max(512)
+  .regex(/^[A-Za-z0-9_-]+$/);
 export const reasonCodes = [
   'HARASSMENT',
   'PRIVATE_INFO',
@@ -69,7 +82,7 @@ export const reportSchema = z
 export const reportsResponseSchema = z
   .object({
     items: z.array(reportSchema).max(20),
-    nextCursor: z.uuid().nullable(),
+    nextCursor: reportCursorSchema.nullable(),
   })
   .strict();
 export const accountsResponseSchema = z

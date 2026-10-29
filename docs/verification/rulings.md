@@ -1,6 +1,6 @@
 # Controller rulings and decision costs
 
-These are the nine exact anchored controller rulings from the execution ledger, in original order. Text below each heading is preserved verbatim; short explanations and ADR/runbook pointers make the decisions usable after scratch cleanup. These are implementation decisions, not new scope or launch approval.
+These are the ten exact anchored controller rulings from the execution ledger, in original order. Text below each heading is preserved verbatim; short explanations and ADR/runbook pointers make the decisions usable after scratch cleanup. These are implementation decisions, not new scope or launch approval.
 
 ## 1. Early PostGIS refresh
 
@@ -55,3 +55,9 @@ Ruling: persist each report's original guest/member category separately from its
 Separate Caddy needs an internal listener. The validated flag costs launcher tests and careful ingress configuration; local rehearsal is never public-provider proof. See [decision context](../operations/deployment.md).
 
 Ruling: keep the existing loopback LOCAL_PREVIEW/LOCAL_PROXY and official Turnstile test contract for Phase9's required dummy-secret production-image rehearsal, and add only an explicit validated container-preview bind option so the app can listen on its internal container interface behind Caddy. Require LOCAL_PREVIEW plus the existing exact loopback APP_ORIGIN; reject the option without that mode, preserve production validation and Turnstile verification unchanged, publish neither web nor DB ports, and bind only the rehearsal Caddy port to host loopback with actual Compose/network assertions — a loopback-only listener inside a container cannot be reached by the separate Caddy container, while a new staging hostname/auth mode would widen more contracts than needed — cost if wrong: extra launcher/config tests and an operator configuration hazard if a future user publishes the internal web port; the explicit mode and local-only rehearsal wiring must not be mistaken for production validation or public-provider proof.
+
+## 10. Actionable chronological report queue
+
+See [ADR 016](../adr/016-edit-concurrency-and-report-discovery.md) for the private cursor and edit precondition contracts.
+
+Ruling: make the moderator queue default to open and reviewing reports in oldest-first creation-time order with report ID as a stable tie-breaker, and expose explicit status/history views with filter-bound keyset cursors. The spec requires an actionable manual queue but leaves its direction/default unspecified; prioritizing oldest pending work prevents resolved history from obscuring it while preserving history inspection. Cost if wrong: this changes the private queue cursor contract and prioritizes aged reports over newer ones; clients must reset pagination when switching views, and operators may prefer a different prioritization after real staffing review. It adds no notifications, automatic hiding, or new identity retention.

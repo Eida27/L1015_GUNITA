@@ -14,6 +14,8 @@ export function browserLocale(languages: readonly string[]): Locale {
 }
 // API messages are never displayed directly: only known, allowlisted codes.
 export const errorKeys = {
+  STALE_EDIT:
+    'This thought changed. Your draft is kept. Reload the saved thought before editing again.',
   VERIFICATION_REQUIRED: 'Complete the verification and try again.',
   VERIFICATION_UNAVAILABLE: 'Verification is unavailable. Please try again.',
   GUIDELINES_REQUIRED:

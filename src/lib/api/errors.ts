@@ -1,4 +1,9 @@
 const errors = {
+  STALE_EDIT: {
+    status: 409,
+    message:
+      'This thought changed. Your draft is kept. Reload the saved thought before editing again.',
+  },
   VERIFICATION_REQUIRED: {
     status: 403,
     message: 'Complete the verification and try again.',

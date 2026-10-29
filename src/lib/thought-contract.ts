@@ -79,6 +79,13 @@ export const consentResponseSchema = z
     accepted: z.boolean(),
   })
   .strict();
+export const editSnapshotSchema = z
+  .object({
+    body: publicThoughtSchema.shape.body,
+    emotion: z.enum(emotions),
+    version: z.string().regex(/^"[A-Za-z0-9_-]{43}"$/),
+  })
+  .strict();
 export const viewerResponseSchema = z
   .object({
     canManage: z.boolean(),

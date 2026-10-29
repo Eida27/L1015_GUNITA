@@ -276,5 +276,10 @@
   "Member": "Miyembro",
   "Thought": "Saloobin",
   "Account": "Account",
-  "Report": "Ulat"
+  "Report": "Ulat",
+  "This thought changed. Your draft is kept. Reload the saved thought before editing again.": "Nabago ang saloobing ito. Nananatili ang iyong draft. I-load muli ang na-save na saloobin bago mag-edit muli.",
+  "Reload saved thought and replace this draft": "I-load muli ang na-save na saloobin at palitan ang draft na ito",
+  "Report view": "Tingnan ang mga ulat",
+  "Awaiting action": "Naghihintay ng aksiyon",
+  "All reports": "Lahat ng ulat"
 }

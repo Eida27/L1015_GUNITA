@@ -1,10 +1,14 @@
 import type { Pool } from 'pg';
+import { z } from 'zod';
+import { ApiError } from '@/lib/api/errors';
 import { parseCookies } from 'better-auth/cookies';
 import { parseJsonBody } from '@/lib/validation/json';
 import {
   reportInputSchema,
   reportsResponseSchema,
   type AdminReport,
+  reportViews,
+  type ReportView,
 } from '@/lib/moderation-contract';
 import { mutationReceiptSchema } from '@/lib/thought-contract';
 import { requireVerifiedMember, type AuthContext } from '@/server/auth/guards';
@@ -95,17 +99,39 @@ export async function inspectReports(
   context: AuthContext,
   actorId: string,
   cursor: string | null,
+  view: ReportView = 'actionable',
 ) {
+  let after: { time: string; id: string } | null = null;
+  if (cursor) {
+    try {
+      const value = z
+        .object({
+          v: z.literal(1),
+          view: z.enum(reportViews),
+          time: z.iso.datetime({ precision: 6 }),
+          id: z.uuid(),
+        })
+        .strict()
+        .parse(JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')));
+      if (value.view !== view) throw new Error('Cursor view mismatch');
+      after = value;
+    } catch {
+      throw new ApiError('INVALID_INPUT');
+    }
+  }
   const rows = (
     await context.client.query(
       `SELECT r.id,r.reason,r.details,r.status,r.created_at AS "createdAt",
+    to_char(r.created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_time,
     r.reporter_category AS "reporterCategory",
     t.public_id,t.body,t.emotion,t.status AS thought_status,t.created_at,t.expires_at,t.location_label,
     ST_X(t.public_point) lng,ST_Y(t.public_point) lat,p.user_id,p.pseudonym,p.role,p.status AS account_status
     FROM reports r JOIN thoughts t ON t.id=r.thought_id JOIN profiles p ON p.user_id=t.author_id
-    WHERE t.expires_at>statement_timestamp() AND ($1::uuid IS NULL OR r.id<$1::uuid)
-    ORDER BY r.id DESC LIMIT 21`,
-      [cursor],
+    WHERE t.expires_at>statement_timestamp()
+    AND ($1='all' OR ($1='actionable' AND r.status IN ('open','reviewing')) OR r.status::text=$1)
+    AND ($2::timestamptz IS NULL OR (r.created_at,r.id)>($2::timestamptz,$3::uuid))
+    ORDER BY r.created_at,r.id LIMIT 21`,
+      [view, after?.time ?? null, after?.id ?? null],
     )
   ).rows;
   const items: AdminReport[] = rows.slice(0, 20).map((r) => ({
@@ -144,7 +170,21 @@ export async function inspectReports(
       null,
     );
   // Validate before the enclosing transaction commits the access audit.
-  const output = { items, nextCursor: rows.length > 20 ? rows[19].id : null };
+  // Use PostgreSQL's full microseconds, not the JS Date used for display.
+  const output = {
+    items,
+    nextCursor:
+      rows.length > 20
+        ? Buffer.from(
+            JSON.stringify({
+              v: 1,
+              view,
+              time: rows[19].cursor_time,
+              id: rows[19].id,
+            }),
+          ).toString('base64url')
+        : null,
+  };
   privateJson(reportsResponseSchema, output);
   return output;
 }

@@ -9,6 +9,7 @@ import {
   relativeThoughtTime,
   publicThoughtSchema,
   viewerResponseSchema,
+  editSnapshotSchema,
   reactionTypes,
   type ViewerResponse,
   type PublicThought,
@@ -47,6 +48,8 @@ export function ThoughtDetail({
   const [checkingViewer, setCheckingViewer] = useState(true);
   const [prompt, setPrompt] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [editVersion, setEditVersion] = useState<string | null>(null);
+  const [conflict, setConflict] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<MessageKey | null>(null);
   const [body, setBody] = useState('');
@@ -83,6 +86,8 @@ export function ThoughtDetail({
       setViewer(null);
       setCheckingViewer(true);
       setEditing(false);
+      setEditVersion(null);
+      setConflict(false);
     }
     function refresh() {
       clear();
@@ -234,9 +239,51 @@ export function ThoughtDetail({
     setBody(thought.body);
     setEmotion(thought.emotion);
     setError(null);
+    setConflict(false);
+  }
+  async function loadEdit() {
+    const epoch = privateEpoch.current;
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/thoughts/${publicId}/edit`, {
+        signal,
+        cache: 'no-store',
+      });
+      const data = await response.json();
+      if (
+        signal.aborted ||
+        !store.isAcknowledged() ||
+        document.hidden ||
+        epoch !== privateEpoch.current
+      )
+        return;
+      if (!response.ok) {
+        setError(errorKey(data.code));
+        return;
+      }
+      const snapshot = editSnapshotSchema.parse(data);
+      setBody(snapshot.body);
+      setEmotion(snapshot.emotion);
+      setEditVersion(snapshot.version);
+      setThought((current) =>
+        current
+          ? { ...current, body: snapshot.body, emotion: snapshot.emotion }
+          : current,
+      );
+      setConflict(false);
+      setEditing(true);
+      editor.current?.focus();
+    } catch {
+      if (!signal.aborted && epoch === privateEpoch.current)
+        setError('Something went wrong. Please try again.');
+    } finally {
+      setBusy(false);
+    }
   }
   async function mutate(method: 'PATCH' | 'DELETE') {
     if (signal.aborted || !store.isAcknowledged()) return;
+    const epoch = privateEpoch.current;
     setBusy(true);
     setError(null);
     try {
@@ -244,14 +291,26 @@ export function ThoughtDetail({
         method,
         signal,
         cache: 'no-store',
-        headers: { 'content-type': 'application/json' },
+        headers: {
+          'content-type': 'application/json',
+          ...(method === 'PATCH' && editVersion
+            ? { 'if-match': editVersion }
+            : {}),
+        },
         ...(method === 'PATCH'
           ? { body: JSON.stringify({ body, emotion }) }
           : {}),
       });
-      if (signal.aborted || !store.isAcknowledged()) return;
+      if (
+        signal.aborted ||
+        !store.isAcknowledged() ||
+        epoch !== privateEpoch.current
+      )
+        return;
       if (!response.ok) {
-        setError(errorKey((await response.json()).code));
+        const code = (await response.json()).code;
+        setConflict(code === 'STALE_EDIT');
+        setError(errorKey(code));
         return;
       }
       setEditing(false);
@@ -383,12 +442,19 @@ export function ThoughtDetail({
               </label>
               <p>{t('Location and expiration stay unchanged.')}</p>
               <button
-                disabled={busy || graphemeCount(body) > 280 || !body.trim()}
+                disabled={
+                  busy ||
+                  conflict ||
+                  !editVersion ||
+                  graphemeCount(body) > 280 ||
+                  !body.trim()
+                }
               >
                 {t('Save changes')}
               </button>
               <button
                 type="button"
+                disabled={busy}
                 onClick={() => {
                   resetDraft();
                   setEditing(false);
@@ -396,14 +462,21 @@ export function ThoughtDetail({
               >
                 {t('Cancel')}
               </button>
+              {conflict ? (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void loadEdit()}
+                >
+                  {t('Reload saved thought and replace this draft')}
+                </button>
+              ) : null}
             </form>
           ) : (
             <button
               ref={editButton}
-              onClick={() => {
-                resetDraft();
-                setEditing(true);
-              }}
+              disabled={busy}
+              onClick={() => void loadEdit()}
             >
               {t('Edit thought')}
             </button>

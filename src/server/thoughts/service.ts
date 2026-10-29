@@ -11,6 +11,7 @@ import {
   consentResponseSchema,
   viewerResponseSchema,
   mutationReceiptSchema,
+  editSnapshotSchema,
 } from '@/lib/thought-contract';
 import type { createAuthService } from '@/server/auth/service';
 import { requireVerifiedMember } from '@/server/auth/guards';
@@ -74,6 +75,14 @@ export function createThoughtService({
   origin: string;
   secret?: string;
 }) {
+  function editVersion(
+    id: string,
+    row: { body: string; emotion: string; revision: string },
+  ) {
+    return `"${createHmac('sha256', secret)
+      .update(JSON.stringify([id, row.revision, row.body, row.emotion]))
+      .digest('base64url')}"`;
+  }
   async function handle(request: Request) {
     try {
       const url = new URL(request.url);
@@ -81,7 +90,7 @@ export function createThoughtService({
         return handleInteraction(request, { auth, origin, secret });
       if (url.search) throw new ApiError('INVALID_INPUT');
       const match = url.pathname.match(
-        /^\/api\/thoughts\/(t_[A-Za-z0-9_-]+)(\/viewer)?$/,
+        /^\/api\/thoughts\/(t_[A-Za-z0-9_-]+)(\/(?:viewer|edit))?$/,
       );
       const id = match ? publicId.parse(match[1]) : null;
       if (request.method === 'GET' && id && !match?.[2])
@@ -91,11 +100,13 @@ export function createThoughtService({
       const consent = url.pathname === '/api/me/consent';
       const creating =
         url.pathname === '/api/thoughts' && request.method === 'POST';
-      const viewing = !!match?.[2] && request.method === 'GET';
+      const viewing = match?.[2] === '/viewer' && request.method === 'GET';
+      const editing = match?.[2] === '/edit' && request.method === 'GET';
       if (
         !(consent && ['GET', 'PUT'].includes(request.method)) &&
         !creating &&
         !viewing &&
+        !editing &&
         !(id && !match?.[2] && ['PATCH', 'DELETE'].includes(request.method))
       )
         return json(
@@ -200,12 +211,31 @@ export function createThoughtService({
           );
         const row = (
           await db.query(
-            'SELECT author_id FROM thoughts WHERE public_id=$1 AND expires_at>statement_timestamp() FOR UPDATE',
+            `SELECT author_id,body,emotion,status,updated_at::text AS revision FROM thoughts WHERE public_id=$1 AND expires_at>statement_timestamp() FOR UPDATE`,
             [id],
           )
         ).rows[0];
         if (!row || row.author_id !== actor.userId)
           throw new ApiError('THOUGHT_UNAVAILABLE');
+        if (editing) {
+          // The locking statement may have started before expiry and waited.
+          // Recheck visibility with a new DB statement while retaining the lock;
+          // body and version still come from the same protected snapshot.
+          const visible = await db.query(
+            "SELECT 1 FROM thoughts WHERE public_id=$1 AND status='published' AND expires_at>statement_timestamp()",
+            [id],
+          );
+          if (!visible.rowCount) throw new ApiError('THOUGHT_UNAVAILABLE');
+          return json(
+            editSnapshotSchema,
+            {
+              body: row.body,
+              emotion: row.emotion,
+              version: editVersion(id!, row),
+            },
+            true,
+          );
+        }
         if (request.method === 'DELETE') {
           await db.query(
             'DELETE FROM thoughts WHERE public_id=$1 AND author_id=$2',
@@ -213,6 +243,10 @@ export function createThoughtService({
           );
           return json(mutationReceiptSchema, { status: true }, true);
         }
+        // The token belongs to the exact snapshot loaded into the draft. Never
+        // infer it from a separate public read or refresh it just before saving.
+        if (request.headers.get('if-match') !== editVersion(id!, row))
+          throw new ApiError('STALE_EDIT');
         const bucket = createHmac('sha256', secret)
           .update(`edits:${actor.userId}`)
           .digest('hex');
@@ -226,8 +260,8 @@ export function createThoughtService({
         ).rows[0].count;
         if (count > 20) throw new ApiError('RATE_LIMITED');
         const data = input as z.infer<typeof edit>;
-        await db.query(
-          'UPDATE thoughts SET body=COALESCE($1,body),emotion=COALESCE($2,emotion),updated_at=statement_timestamp() WHERE public_id=$3 AND author_id=$4',
+        const updated = await db.query(
+          "UPDATE thoughts SET body=COALESCE($1,body),emotion=COALESCE($2,emotion),updated_at=GREATEST(clock_timestamp(),updated_at+interval '1 microsecond') WHERE public_id=$3 AND author_id=$4 AND expires_at>statement_timestamp() RETURNING public_id",
           [
             data.body === undefined ? null : validateThoughtBody(data.body),
             data.emotion ?? null,
@@ -235,6 +269,7 @@ export function createThoughtService({
             actor.userId,
           ],
         );
+        if (!updated.rowCount) throw new ApiError('THOUGHT_UNAVAILABLE');
         return json(mutationReceiptSchema, { status: true }, true);
       });
     } catch (error) {
@@ -251,7 +286,7 @@ export function createThoughtService({
       )
         return errorResponse(new ApiError('POST_LIMIT_REACHED'));
       const response = errorResponse(error);
-      if (new URL(request.url).pathname.endsWith('/viewer'))
+      if (/\/(viewer|edit)$/.test(new URL(request.url).pathname))
         response.headers.set('Cache-Control', 'private, no-store');
       return response;
     }

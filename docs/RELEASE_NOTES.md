@@ -24,3 +24,7 @@ The retained audit has **one moderate transitive esbuild advisory, zero high/cri
 The same main DB/Mailpit and volume, retained manual Browser DB and unknown DB are preserved. Local staging remains separate; remove only exact owned rehearsal containers/logs within seven days after review as documented. No broad prune is authorized.
 
 Automatic approval review twice rejected deletion of inactive `C:/Users/anula/AppData/Local/Temp/gunita-phase0-proof-6eeef800` as “blocked by policy.” Its owned services/networks/volume were removed; the directory remains untouched. This cleanup residual is not a public-running service claim.
+
+## Consolidated final-review fixes
+
+The broad review identified FBR-I01 (stale edit overwrite) and FBR-I02 (resolved reports obscuring actionable work). The amended source adds private coherent edit snapshots/required If-Match/409 with draft retention, plus the oldest-first actionable queue and explicit history views. No schema migration or public DTO expansion. Earlier 174-test and artifact receipts above remain pre-fix evidence. See [current final-fix validation](verification/final-fix.md); changed-UI Browser acceptance is complete and controller scoped rereview remains pending.
